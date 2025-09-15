@@ -11,15 +11,24 @@ exports.handler = async function(event) {
       headers: { 'Content-Type': 'application/json' }
     };
   }
+
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+
     const response = await fetch(url, {
-      timeout: 7000,
+      signal: controller.signal,
       headers: { 'User-Agent': 'BookitBot/1.0' }
     });
-    if (!response.ok) throw new Error('Fetch failed');
+    clearTimeout(timeout);
+
+    if (!response.ok) throw new Error('Fetch failed: ' + response.status);
+
     const html = await response.text();
     const $ = cheerio.load(html);
-    const title = ($('meta[property="og:title"]').attr('content') || $('title').text() || '').trim();
+
+    const title =
+      ($('meta[property="og:title"]').attr('content') || $('title').text() || '').trim();
     const image = (
       $('meta[property="og:image"]').attr('content') ||
       $('meta[name="twitter:image"]').attr('content') ||
@@ -30,10 +39,11 @@ exports.handler = async function(event) {
       $('meta[name="description"]').attr('content') ||
       ''
     ).trim();
+
     return {
       statusCode: 200,
       body: JSON.stringify({ title, image, description }),
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' }
     };
   } catch (e) {
     console.error('fetch-metadata error', e);

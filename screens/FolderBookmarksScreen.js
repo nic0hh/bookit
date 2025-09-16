@@ -1,7 +1,7 @@
 // screens/FolderBookmarksScreen.js
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useContext, useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, Image, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import MasonryList from '@react-native-seoul/masonry-list';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [shuffledBookmarks, setShuffledBookmarks] = useState([]);
   const [filteredBookmarks, setFilteredBookmarks] = useState([]);
+  const [cardWidth, setCardWidth] = useState(200);
   const debounceTimeout = useRef(null);
   const hasShuffled = useRef(false);
 
@@ -56,15 +57,48 @@ export default function FolderBookmarksScreen({ navigation, route }) {
     }, 150);
   }, [searchQuery, shuffledBookmarks]);
 
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      function updateCardWidth() {
+        const columns = 5;
+        const gutter = 8;
+        const totalGutter = gutter * (columns + 1);
+        const width = Math.max(
+          140,
+          Math.floor((window.innerWidth - totalGutter) / columns)
+        );
+        setCardWidth(width);
+      }
+      updateCardWidth();
+      window.addEventListener('resize', updateCardWidth);
+      return () => window.removeEventListener('resize', updateCardWidth);
+    }
+  }, []);
+
   const renderBookmark = ({ item }) => (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card }]}
+      style={[
+        styles.card,
+        { backgroundColor: colors.card },
+        Platform.OS === 'web' ? { width: cardWidth } : {},
+      ]}
       onPress={() => navigation.navigate('BookmarkDetail', { bookmark: item })}
     >
       {item?.image ? (
         <Image
           source={{ uri: String(item.image) }}
-          style={[styles.image, { height: item.height || 200 }]}
+          style={[
+            styles.image,
+            Platform.OS === 'web'
+              ? {
+                  aspectRatio:
+                    item.imageWidth && item.imageHeight
+                      ? item.imageWidth / item.imageHeight
+                      : 1.5,
+                  height: item.imageWidth && item.imageHeight ? undefined : 300, // taller fallback
+                }
+              : { height: item.height || 200 },
+          ]}
         />
       ) : (
         <View style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground }]}>
@@ -114,7 +148,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
         data={filteredBookmarks}
         keyExtractor={(item, idx) => item.id || idx.toString()}
         renderItem={renderBookmark}
-        numColumns={2}
+        numColumns={Platform.OS === 'web' ? 5 : 2}
         contentContainerStyle={styles.listContent}
       />
     </View>
@@ -167,7 +201,7 @@ const styles = StyleSheet.create({
   },
   title: {
     padding: 12,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 0.5,
     fontFamily: 'Quicksand',

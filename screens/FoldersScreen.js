@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { ThemeContext } from '../ThemeContext';
@@ -69,9 +69,25 @@ export default function FoldersScreen({ navigation }) {
               shadowOpacity: 0.1,
               shadowRadius: 8,
               elevation: 4,
+              // 👇 Web-only styles
+              ...(Platform.OS === 'web'
+                ? {
+                    maxWidth: 340,
+                    alignSelf: 'center',
+                    width: '100%',
+                  }
+                : {}),
             }}
           >
-            <Text style={{ color: colors.text, fontFamily: 'Quicksand', fontSize: 16 }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontFamily: 'Quicksand',
+                fontSize: 17,                // 👈 updated font size
+                fontWeight: 'bold',          // 👈 make it bold
+                ...(Platform.OS === 'web' ? { textAlign: 'center' } : {}),
+              }}
+            >
               {item.name}
             </Text>
           </TouchableOpacity>
@@ -87,17 +103,30 @@ export default function FoldersScreen({ navigation }) {
 
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 12,
-          paddingVertical: 10,
           borderTopWidth: 1,
           borderColor: colors.inputBorder,
           backgroundColor: colors.background,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
         }}
       >
-        <TextInput
-          value={newFolder}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            // 👇 Web-only: center and shrink
+            ...(Platform.OS === 'web'
+              ? {
+                  maxWidth: 340,
+                  alignSelf: 'center',
+                  width: '100%',
+                }
+              : {}),
+          }}
+        >
+          <TextInput
+            value={newFolder}
             onChangeText={setNewFolder}
             placeholder="New folder name"
             placeholderTextColor={colors.label}
@@ -111,22 +140,39 @@ export default function FoldersScreen({ navigation }) {
               paddingVertical: 10,
               fontFamily: 'Quicksand',
               color: colors.text,
+              ...(Platform.OS === 'web'
+                ? {
+                    fontSize: 15,
+                    minWidth: 0,
+                    maxWidth: 180,
+                  }
+                : {}),
             }}
-        />
-        <TouchableOpacity
-          onPress={createFolder}
-          disabled={!newFolder.trim()}
-          style={{
-            marginLeft: 10,
-            backgroundColor: colors.button,
-            borderRadius: 12,
-            paddingHorizontal: 18,
-            paddingVertical: 12,
-            opacity: newFolder.trim() ? 1 : 0.5,
-          }}
-        >
-          <Text style={{ fontFamily: 'Quicksand', color: colors.buttonText }}>Add</Text>
-        </TouchableOpacity>
+          />
+          <TouchableOpacity
+            onPress={createFolder}
+            disabled={!newFolder.trim()}
+            style={{
+              marginLeft: 10,
+              backgroundColor: colors.button,
+              borderRadius: 12,
+              paddingHorizontal: 18,
+              paddingVertical: 12,
+              opacity: newFolder.trim() ? 1 : 0.5,
+              ...(Platform.OS === 'web'
+                ? {
+                    minWidth: 0,
+                    maxWidth: 80,
+                    paddingHorizontal: 12,
+                  }
+                : {}),
+            }}
+          >
+            <Text style={{ fontFamily: 'Quicksand', color: colors.buttonText, ...(Platform.OS === 'web' ? { fontSize: 15 } : {}) }}>
+              Add
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );

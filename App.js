@@ -81,8 +81,25 @@ function MainTabs() {
           }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007aff',
-        tabBarInactiveTintColor: 'gray',
+        tabBarStyle: Platform.OS === 'web'
+          ? {
+              backgroundColor: colors.card,
+              borderTopColor: colors.inputBorder,
+              height: 56,
+              paddingHorizontal: 0,
+              justifyContent: 'center',
+              display: 'flex',
+              gap: 0, // 👈 This will bring icons closer together on web
+            }
+          : {
+              backgroundColor: colors.card,
+              borderTopColor: colors.inputBorder,
+            },
+        tabBarItemStyle: Platform.OS === 'web'
+          ? {}
+          : {},
+        tabBarActiveTintColor: colors.text,
+        tabBarInactiveTintColor: colors.label,
       })}
     >
       <Tab.Screen
@@ -167,16 +184,25 @@ function AppInner() {
             }
             return <Ionicons name={iconName} size={size} color={color} />;
           },
-          tabBarStyle: {
-            backgroundColor: colors.card,
-            borderTopColor: colors.inputBorder,
-          },
+          tabBarStyle: Platform.OS === 'web'
+            ? {
+                backgroundColor: colors.card,
+                borderTopColor: colors.inputBorder,
+                height: 56,
+                paddingHorizontal: 0,
+                justifyContent: 'center',
+                display: 'flex',
+                gap: 0, // 👈 This will bring icons closer together on web
+              }
+            : {
+                backgroundColor: colors.card,
+                borderTopColor: colors.inputBorder,
+              },
+          tabBarItemStyle: Platform.OS === 'web'
+            ? {}
+            : {},
           tabBarActiveTintColor: colors.text,
           tabBarInactiveTintColor: colors.label,
-          // 👇 Add this for web only
-          tabBarItemStyle: Platform.OS === 'web'
-            ? { marginHorizontal: -12 } // negative margin brings icons closer
-            : {},
         })}
       >
         <Tab.Screen

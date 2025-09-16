@@ -4,18 +4,24 @@ import { supabase } from '../supabaseClient';
 export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null);
+  const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session || null);
+    // Get current session on mount
+    const session = supabase.auth.getSession().then(({ data }) => {
+      setUser(data?.session?.user || null);
       setInitializing(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
+
+    // Listen for auth changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
     });
-    return () => sub.subscription.unsubscribe();
+
+    return () => {
+      listener?.subscription?.unsubscribe?.();
+    };
   }, []);
 
   const signIn = useCallback(async (email, password) => {
@@ -32,12 +38,11 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut();
   }, []);
 
-  const isVerified = session?.user?.email_confirmed_at || session?.user?.confirmed_at;
+  const isVerified = user?.email_confirmed_at || user?.confirmed_at;
 
   return (
     <AuthContext.Provider value={{
-      session,
-      user: session?.user || null,
+      user,
       initializing,
       signIn,
       signUp,

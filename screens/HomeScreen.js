@@ -1,6 +1,6 @@
 // screens/HomeScreen.js
-import React, { useContext, useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, Image, StyleSheet, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
+import React, { useContext, useState, useEffect, useMemo, useRef } from 'react';
+import { View, Text, TextInput, Image, StyleSheet, TouchableOpacity, Modal, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MasonryList from '@react-native-seoul/masonry-list';
 import { AuthContext } from '../context/AuthContext';
@@ -8,6 +8,7 @@ import { BookmarksContext } from '../context/BookmarksContext';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../ThemeContext';
 
+// Shuffle helper
 function shuffleArray(array) {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -18,93 +19,135 @@ function shuffleArray(array) {
 }
 
 export default function HomeScreen({ navigation }) {
-  const { bookmarks } = useContext(BookmarksContext);
+  const { bookmarks, reloadAll, loadingRemote } = useContext(BookmarksContext);
   const { signOut, user } = useContext(AuthContext);
-  const { theme, toggleTheme, colors, setTheme } = useContext(ThemeContext);
+  const { theme, colors, setTheme } = useContext(ThemeContext);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [shuffledBookmarks, setShuffledBookmarks] = useState([]);
   const [filteredBookmarks, setFilteredBookmarks] = useState([]);
-  const debounceTimeout = useRef(null);
-  const hasShuffled = useRef(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const { reloadAll, loadingRemote } = useContext(BookmarksContext);
+  const [cardWidth, setCardWidth] = useState(200);
+  const debounceTimeout = useRef(null);
 
+  // Shuffle once
   useEffect(() => {
-    if (bookmarks.length > 0 && !hasShuffled.current) {
+    if (bookmarks.length > 0) {
       const shuffled = shuffleArray(bookmarks);
       setShuffledBookmarks(shuffled);
       setFilteredBookmarks(shuffled);
-      hasShuffled.current = true;
     }
   }, [bookmarks]);
 
-  useEffect(() => {
-    if (hasShuffled.current) {
-      setShuffledBookmarks(bookmarks);
-      setFilteredBookmarks(bookmarks);
-    }
-  }, [bookmarks]);
-
+  // Debounced search (by title or tags)
   useEffect(() => {
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-
     debounceTimeout.current = setTimeout(() => {
-      const queryTags = searchQuery.toLowerCase().split(' ').filter(Boolean);
-      if (queryTags.length === 0) {
+      const q = searchQuery.toLowerCase();
+      if (!q) {
         setFilteredBookmarks(shuffledBookmarks);
       } else {
-        const filtered = shuffledBookmarks.filter(b => {
-          if (!b.tags || b.tags.length === 0) return false;
-          return queryTags.every(qt =>
-            b.tags.map(t => t.toLowerCase()).includes(qt)
-          );
-        });
+        const filtered = shuffledBookmarks.filter(
+          b =>
+            b.title?.toLowerCase().includes(q) ||
+            b.tags?.some(tag => tag.toLowerCase().includes(q))
+        );
         setFilteredBookmarks(filtered);
       }
     }, 150);
   }, [searchQuery, shuffledBookmarks]);
 
-  const renderBookmark = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card }]}
-      onPress={() => navigation.navigate('BookmarkDetail', { bookmark: item })}
-      activeOpacity={0.85}
+  // Responsive card width on web
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      function updateCardWidth() {
+        const columns = 5;
+        const gutter = 8;
+        const totalGutter = gutter * (columns + 1);
+        const width = Math.max(
+          140,
+          Math.floor((window.innerWidth - totalGutter) / columns)
+        );
+        setCardWidth(width);
+      }
+      updateCardWidth();
+      window.addEventListener('resize', updateCardWidth);
+      return () => window.removeEventListener('resize', updateCardWidth);
+    }
+  }, []);
+
+  const CARD_IMAGE_HEIGHT = 280; // consistent fallback
+
+  // Render each bookmark card
+const renderBookmark = ({ item }) => (
+  <TouchableOpacity
+    style={[
+      styles.card,
+      { backgroundColor: colors.card },
+      Platform.OS === 'web' ? { width: cardWidth } : {},
+    ]}
+    onPress={() => navigation.navigate('BookmarkDetail', { bookmark: item })}
+    activeOpacity={0.85}
+  >
+    {item?.image ? (
+      <Image
+        source={{ uri: String(item.image) }}
+        style={[
+          styles.image,
+          Platform.OS === 'web'
+            ? {
+                aspectRatio:
+                  item.imageWidth && item.imageHeight
+                    ? item.imageWidth / item.imageHeight
+                    : 1.5,
+                height: item.imageWidth && item.imageHeight ? undefined : 300, // fallback
+              }
+            : { height: item.height || 200 },
+        ]}
+        resizeMode="cover"
+      />
+    ) : (
+      <View style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground }]}>
+        <Text style={{ color: colors.label }}>No image</Text>
+      </View>
+    )}
+    <Text
+      style={[
+        styles.title,
+        { 
+          color: colors.text,
+          fontSize: 17,        // 👈 smaller font size
+          fontWeight: 'bold',  // 👈 ensure bold
+        }
+      ]}
     >
-      {item?.image ? (
-        <Image
-          source={{ uri: String(item.image) }}
-          style={[styles.image, { height: item.height || 200 }]}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground }]}>
-          <Text style={{ color: colors.label }}>No image</Text>
-        </View>
-      )}
-      <Text style={[styles.title, { color: colors.text }]}>{item?.title || 'Untitled'}</Text>
-      {item?.tags?.length > 0 && (
-        <View style={styles.tagsContainer}>
-          {item.tags.map((tag, idx) => (
-            <Text
-              key={idx}
-              style={[
-                styles.tag,
-                { backgroundColor: colors.tag, color: colors.tagText, fontFamily: 'Quicksand' },
-                searchQuery.toLowerCase().includes(tag.toLowerCase())
-                  ? [styles.tagHighlighted, { backgroundColor: colors.gray, color: colors.background }]
-                  : null
-              ]}
-            >
-              {tag}
-            </Text>
-          ))}
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+      {item?.title || 'Untitled'}
+    </Text>
+    {item?.tags?.length > 0 && (
+      <View style={styles.tagsContainer}>
+        {item.tags.map((tag, idx) => (
+          <Text
+            key={idx}
+            style={[
+              styles.tag,
+              { backgroundColor: colors.tag, color: colors.tagText, fontFamily: 'Quicksand' },
+              searchQuery.toLowerCase().includes(tag.toLowerCase())
+                ? [styles.tagHighlighted, { backgroundColor: colors.gray, color: colors.background }]
+                : null
+            ]}
+          >
+            {tag}
+          </Text>
+        ))}
+      </View>
+    )}
+  </TouchableOpacity>
+);
+
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Top bar with search + settings */}
       <View style={styles.topBar}>
         <TextInput
           style={[
@@ -124,33 +167,32 @@ export default function HomeScreen({ navigation }) {
           <Ionicons name="settings-outline" size={24} color={colors.settingsIcon} />
         </TouchableOpacity>
       </View>
+
+      {/* Masonry grid */}
       <MasonryList
         data={filteredBookmarks}
         keyExtractor={(item, idx) => item.id || idx.toString()}
         renderItem={renderBookmark}
-        numColumns={2}
+        numColumns={Platform.OS === 'web' ? 5 : 2}
         contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          !loadingRemote ? (
+            <Text style={{ color: colors.label, textAlign: 'center', marginTop: 40, fontFamily: 'Quicksand' }}>
+              No bookmarks yet
+            </Text>
+          ) : null
+        }
       />
+
+      {/* Settings modal */}
       <Modal
         visible={settingsVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setSettingsVisible(false)}
       >
-        <View style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.3)',
-          justifyContent: 'center',
-          alignItems: 'center'
-        }}>
-          <View style={{
-            backgroundColor: colors.card,
-            borderRadius: 16,
-            padding: 24,
-            minWidth: 250,
-            alignItems: 'center'
-          }}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
             <View style={{ width: '100%', alignItems: 'center' }}>
               {user?.email && (
                 <Text style={{ fontFamily: 'Quicksand', fontSize: 14, color: colors.label, marginBottom: 14 }}>
@@ -162,36 +204,32 @@ export default function HomeScreen({ navigation }) {
                 Theme
               </Text>
 
-              {[
-                { label: 'Light', value: 'light' },
-                { label: 'Dark', value: 'dark' },
-                { label: 'Pink', value: 'softPink' },
-                { label: 'Green', value: 'green' },
-                { label: 'Orange', value: 'softOrange' },
-              ].map(t => (
+              {['light', 'dark', 'softPink', 'green', 'softOrange'].map(t => (
                 <TouchableOpacity
-                  key={t.value}
+                  key={t}
                   style={{
                     paddingVertical: 12,
                     paddingHorizontal: 18,
                     marginBottom: 10,
-                    backgroundColor: theme === t.value ? colors.button : colors.inputBackground,
+                    backgroundColor: theme === t ? colors.button : colors.inputBackground,
                     borderRadius: 12,
                     alignItems: 'center',
                     width: 200,
                   }}
                   onPress={() => {
-                    setTheme(t.value);
+                    setTheme(t);
                     setSettingsVisible(false);
                   }}
                 >
-                  <Text style={{
-                    fontFamily: 'Quicksand',
-                    fontSize: 16,
-                    color: theme === t.value ? colors.buttonText : colors.text,
-                    fontWeight: theme === t.value ? 'bold' : 'normal'
-                  }}>
-                    {t.label}
+                  <Text
+                    style={{
+                      fontFamily: 'Quicksand',
+                      fontSize: 16,
+                      color: theme === t ? colors.buttonText : colors.text,
+                      fontWeight: theme === t ? 'bold' : 'normal',
+                    }}
+                  >
+                    {t.charAt(0).toUpperCase() + t.slice(1).replace('soft', '')}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -203,9 +241,7 @@ export default function HomeScreen({ navigation }) {
                   setSettingsVisible(false);
                 }}
               >
-                <Text style={{ fontFamily: 'Quicksand', fontSize: 14, color: colors.label }}>
-                  Reload Data
-                </Text>
+                <Text style={{ fontFamily: 'Quicksand', fontSize: 14, color: colors.label }}>Reload Data</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -215,21 +251,18 @@ export default function HomeScreen({ navigation }) {
                   setSettingsVisible(false);
                 }}
               >
-                <Text style={{ fontFamily: 'Quicksand', fontSize: 15, color: '#d72660' }}>
-                  Sign Out
-                </Text>
+                <Text style={{ fontFamily: 'Quicksand', fontSize: 15, color: '#d72660' }}>Sign Out</Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => setSettingsVisible(false)}>
-                <Text style={{ color: colors.label, fontFamily: 'Quicksand', fontSize: 15 }}>
-                  Close
-                </Text>
+                <Text style={{ color: colors.label, fontFamily: 'Quicksand', fontSize: 15 }}>Close</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-      {/* (Optional) show loading indicator over content: */}
+
+      {/* Remote loading indicator */}
       {loadingRemote && (
         <View style={{ position: 'absolute', top: 70, left: 0, right: 0, alignItems: 'center' }}>
           <ActivityIndicator color={colors.label} />
@@ -244,7 +277,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
-    backgroundColor: 'transparent',
   },
   searchInput: {
     flex: 1,
@@ -276,20 +308,20 @@ const styles = StyleSheet.create({
     height: 200,
     justifyContent: 'center',
     alignItems: 'center',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
   },
   title: {
     padding: 12,
-    fontSize: 19,
+    fontSize: 20,
     fontWeight: 'bold',
     letterSpacing: 0.5,
     fontFamily: 'Quicksand',
+    textAlign: 'center',
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     padding: 10,
+    justifyContent: 'center',
   },
   tag: {
     borderRadius: 15,
@@ -307,4 +339,17 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 10,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    borderRadius: 16,
+    padding: 24,
+    minWidth: 250,
+    alignItems: 'center',
+  },
 });
+

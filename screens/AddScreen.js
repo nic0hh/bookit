@@ -6,7 +6,7 @@ import { BookmarksContext } from '../context/BookmarksContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemeContext } from '../ThemeContext';
 
-const API_BASE = 'https://bookit-5000.netlify.app/.netlify/functions';
+const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
 
 export default function AddScreen({ navigation }) {
   const { addBookmark, folders } = useContext(BookmarksContext);

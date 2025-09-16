@@ -3,7 +3,21 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const { URL } = require("url");
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Content-Type": "application/json",
+};
+
 exports.handler = async function (event, context) {
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: ''
+    };
+  }
+
   try {
     const { url } = JSON.parse(event.body);
 
@@ -156,12 +170,14 @@ exports.handler = async function (event, context) {
     return {
       statusCode: 200,
       body: JSON.stringify({ title, image }),
+      headers: corsHeaders
     };
   } catch (err) {
     console.error("Preview error:", err.message);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: "Failed to fetch preview" }),
+      headers: corsHeaders
     };
   }
 };

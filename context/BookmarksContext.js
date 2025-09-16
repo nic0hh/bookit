@@ -79,7 +79,7 @@ export function BookmarksProvider({ children }) {
     if (!clean) return 'Folder name required';
     const { data, error } = await supabase
       .from('folders')
-      .insert({ name: clean })
+      .insert({ name: clean, user_id: user.id }) // <-- add user_id
       .select()
       .single();
     if (!error && data) {
@@ -126,6 +126,7 @@ export function BookmarksProvider({ children }) {
         image: image || null,
         tags,
         folder_id: folderId || null,
+        user_id: user.id // <-- add user_id
       })
       .select()
       .single();

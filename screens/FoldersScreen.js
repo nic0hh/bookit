@@ -11,9 +11,15 @@ export default function FoldersScreen({ navigation }) {
     addFolder,
     removeFolder,
     loadingRemote,
+    editFolder,
   } = useContext(BookmarksContext);
 
+  const { setThemeName } = useContext(ThemeContext);
+
   const [newFolder, setNewFolder] = useState('');
+  const [editingFolder, setEditingFolder] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editModalVisible, setEditModalVisible] = useState(false);
 
   const createFolder = async () => {
     if (!newFolder.trim()) return;
@@ -23,23 +29,43 @@ export default function FoldersScreen({ navigation }) {
 
   const confirmDelete = (folder) => {
     Alert.alert(
-      'Delete Folder',
-      `Delete "${folder.name}"?`,
+      folder.name,
+      undefined,
       [
+        {
+          text: 'Edit',
+          onPress: () => {
+            setEditingFolder(folder);
+            setEditName(folder.name);
+            setEditModalVisible(true);
+          },
+        },
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              await removeFolder(folder.id);
-            },
+          style: 'destructive',
+          onPress: async () => {
+            await removeFolder(folder.id);
+          },
         },
       ]
     );
   };
 
+  const handleSave = async () => {
+    const error = await editFolder(editingFolder.id, editName.trim());
+    if (error) {
+      Alert.alert('Error', error);
+    } else {
+      setEditModalVisible(false); // or navigation.goBack()
+    }
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      edges={['top']} // 👈 only apply safe area to the top
+    >
       {loadingRemote && (
         <ActivityIndicator style={{ marginTop: 10 }} color={colors.label} />
       )}
@@ -47,7 +73,9 @@ export default function FoldersScreen({ navigation }) {
       <FlatList
         data={folders}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+        }}
         renderItem={({ item, index }) => (
           <TouchableOpacity
             activeOpacity={0.85}
@@ -101,6 +129,7 @@ export default function FoldersScreen({ navigation }) {
         }
       />
 
+      {/* Input bar stays flush at the bottom */}
       <View
         style={{
           borderTopWidth: 1,
@@ -174,6 +203,69 @@ export default function FoldersScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+
+      {editModalVisible && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.card,
+              borderRadius: 16,
+              padding: 24,
+              width: 280,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <Text style={{ fontFamily: 'Quicksand', fontSize: 16, marginBottom: 12, color: colors.text }}>
+              Edit folder name
+            </Text>
+            <TextInput
+              value={editName}
+              onChangeText={setEditName}
+              style={{
+                backgroundColor: colors.inputBackground,
+                borderWidth: 1,
+                borderColor: colors.inputBorder,
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontFamily: 'Quicksand',
+                color: colors.text,
+                marginBottom: 16,
+              }}
+              placeholder="Folder name"
+              placeholderTextColor={colors.label}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                style={{ marginRight: 12 }}
+              >
+                <Text style={{ color: colors.label, fontFamily: 'Quicksand', fontSize: 15 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSave}
+                style={{ backgroundColor: colors.button, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 }}
+                disabled={!editName.trim()}
+              >
+                <Text style={{ color: colors.buttonText, fontFamily: 'Quicksand', fontSize: 15 }}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }

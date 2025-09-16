@@ -90,16 +90,23 @@ export function BookmarksProvider({ children }) {
   }
 
   async function editFolder(id, name) {
-    if (!user) return;
+    if (!user) return 'Not signed in';
     const clean = name.trim().slice(0, 120);
-    if (!clean) return;
+    if (!clean) return 'Folder name required';
+
     const { error } = await supabase
       .from('folders')
       .update({ name: clean })
-      .eq('id', id);
-    if (!error) {
-      setFolders(prev => prev.map(f => (f.id === id ? { ...f, name: clean } : f)));
-    }
+      .eq('id', id)
+      .eq('user_id', user.id); // 👈 add user_id for RLS
+
+    if (error) return error.message || 'Failed to update folder';
+
+    setFolders(prev =>
+      prev.map(f => (f.id === id ? { ...f, name: clean } : f))
+    );
+
+    return null; // success
   }
 
   async function removeFolder(id) {
@@ -293,7 +300,7 @@ export function BookmarksProvider({ children }) {
     bookmarks,
     folders,
     loadingRemote,
-    migrating, // <-- add this
+    migrating,
     addFolder,
     editFolder,
     removeFolder,

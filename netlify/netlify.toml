@@ -1,0 +1,30 @@
+functionsDirectory = "C:\\Users\\nicoh\\Bookit\\netlify\\functions"
+functionsDirectoryOrigin = "default"
+plugins = []
+headers = []
+redirects = []
+
+[build]
+publish = "C:\\Users\\nicoh\\Bookit\\dist"
+publishOrigin = "ui"
+commandOrigin = "ui"
+command = "expo export -p web"
+functions = "C:\\Users\\nicoh\\Bookit\\netlify\\functions"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[functions]
+
+[functions."*"]

@@ -1,0 +1,21 @@
+{
+	"siteId": "01329329-c90d-48fe-9545-29592e017ae8",
+	"geolocation": {
+		"data": {
+			"city": "The Hague",
+			"country": {
+				"code": "NL",
+				"name": "The Netherlands"
+			},
+			"subdivision": {
+				"code": "ZH",
+				"name": "South Holland"
+			},
+			"timezone": "Europe/Amsterdam",
+			"latitude": 52.0953,
+			"longitude": 4.3191,
+			"postalCode": "2596"
+		},
+		"timestamp": 1755534145514
+	}
+}

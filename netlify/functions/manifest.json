@@ -1,0 +1,1 @@
+{"functions":[{"bundler":"zisi","buildData":{"runtimeAPIVersion":1},"mainFile":"C:\\Users\\nicoh\\Bookit\\netlify\\functions\\getPreview.js","name":"getPreview","priority":10,"runtimeVersion":"nodejs22.x","path":"C:\\Users\\nicoh\\Bookit\\.netlify\\functions\\getPreview.zip","runtime":"js"}],"system":{"arch":"x64","platform":"win32"},"timestamp":1756051990639,"version":1}

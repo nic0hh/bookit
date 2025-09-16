@@ -21,7 +21,7 @@ function shuffleArray(array) {
 export default function HomeScreen({ navigation }) {
   const { bookmarks, reloadAll, loadingRemote } = useContext(BookmarksContext);
   const { signOut, user } = useContext(AuthContext);
-  const { theme, colors, setTheme } = useContext(ThemeContext);
+  const { theme, colors, setThemeName } = useContext(ThemeContext);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [shuffledBookmarks, setShuffledBookmarks] = useState([]);
@@ -30,12 +30,25 @@ export default function HomeScreen({ navigation }) {
   const [cardWidth, setCardWidth] = useState(200);
   const debounceTimeout = useRef(null);
 
+  // Add this ref for web session shuffle
+  const shuffledRef = useRef(null);
+
   // Shuffle once
   useEffect(() => {
     if (bookmarks.length > 0) {
-      const shuffled = shuffleArray(bookmarks);
-      setShuffledBookmarks(shuffled);
-      setFilteredBookmarks(shuffled);
+      if (Platform.OS === 'web') {
+        // Only shuffle once per session
+        if (!shuffledRef.current) {
+          shuffledRef.current = shuffleArray(bookmarks);
+        }
+        setShuffledBookmarks(shuffledRef.current);
+        setFilteredBookmarks(shuffledRef.current);
+      } else {
+        // On app, shuffle every time bookmarks change
+        const shuffled = shuffleArray(bookmarks);
+        setShuffledBookmarks(shuffled);
+        setFilteredBookmarks(shuffled);
+      }
     }
   }, [bookmarks]);
 
@@ -62,7 +75,7 @@ export default function HomeScreen({ navigation }) {
     if (Platform.OS === 'web') {
       function updateCardWidth() {
         const columns = 5;
-        const gutter = 8;
+        const gutter = 15;
         const totalGutter = gutter * (columns + 1);
         const width = Math.max(
           140,
@@ -84,7 +97,9 @@ const renderBookmark = ({ item }) => (
     style={[
       styles.card,
       { backgroundColor: colors.card },
-      Platform.OS === 'web' ? { width: cardWidth } : {},
+      Platform.OS === 'web'
+        ? { width: cardWidth, margin: 12 } // 👈 reduce from 20 to 12 for web
+        : { margin: 8 },
     ]}
     onPress={() => navigation.navigate('BookmarkDetail', { bookmark: item })}
     activeOpacity={0.85}
@@ -100,7 +115,7 @@ const renderBookmark = ({ item }) => (
                   item.imageWidth && item.imageHeight
                     ? item.imageWidth / item.imageHeight
                     : 1.5,
-                height: item.imageWidth && item.imageHeight ? undefined : 300, // fallback
+                height: item.imageWidth && item.imageHeight ? undefined : 300,
               }
             : { height: item.height || 200 },
         ]}
@@ -116,14 +131,14 @@ const renderBookmark = ({ item }) => (
         styles.title,
         { 
           color: colors.text,
-          fontSize: 17,        // 👈 smaller font size
-          fontWeight: 'bold',  // 👈 ensure bold
+          fontSize: 17,
+          fontWeight: 'bold',
         }
       ]}
     >
       {item?.title || 'Untitled'}
     </Text>
-    {item?.tags?.length > 0 && (
+    {Platform.OS === 'web' && item?.tags?.length > 0 && (
       <View style={styles.tagsContainer}>
         {item.tags.map((tag, idx) => (
           <Text
@@ -146,7 +161,7 @@ const renderBookmark = ({ item }) => (
 
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       {/* Top bar with search + settings */}
       <View style={styles.topBar}>
         <TextInput
@@ -174,7 +189,10 @@ const renderBookmark = ({ item }) => (
         keyExtractor={(item, idx) => item.id || idx.toString()}
         renderItem={renderBookmark}
         numColumns={Platform.OS === 'web' ? 5 : 2}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={{
+          padding: 10,
+          paddingBottom: 0, // 👈 ensure no extra bottom padding
+        }}
         ListEmptyComponent={
           !loadingRemote ? (
             <Text style={{ color: colors.label, textAlign: 'center', marginTop: 40, fontFamily: 'Quicksand' }}>
@@ -217,7 +235,7 @@ const renderBookmark = ({ item }) => (
                     width: 200,
                   }}
                   onPress={() => {
-                    setTheme(t);
+                    setThemeName(t);
                     setSettingsVisible(false);
                   }}
                 >
@@ -289,7 +307,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   card: {
-    margin: 8,
+    margin: 8, // 👈 reduce default margin
     borderRadius: 18,
     overflow: 'hidden',
     shadowColor: '#000',

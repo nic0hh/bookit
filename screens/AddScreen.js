@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, TextInput, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Modal, FlatList, Alert } from 'react-native';
+import { View, TextInput, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Modal, FlatList, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,7 +10,7 @@ const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
 
 export default function AddScreen({ navigation }) {
   const { addBookmark, folders } = useContext(BookmarksContext);
-  const { colors } = useContext(ThemeContext);
+  const { colors, setThemeName } = useContext(ThemeContext);
 
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -137,7 +137,7 @@ export default function AddScreen({ navigation }) {
           }}
           onPress={() => setVisible(true)}
         >
-          <Text style={{ color: colors.pickerText }}>{selectedLabel}</Text>
+          <Text style={{ color: colors.text }}>{selectedLabel}</Text>
         </TouchableOpacity>
         <Modal visible={visible} transparent animationType="fade">
           <TouchableOpacity
@@ -175,7 +175,7 @@ export default function AddScreen({ navigation }) {
                       setVisible(false);
                     }}
                   >
-                    <Text style={{ color: colors.pickerText, fontSize: 17 }}>
+                    <Text style={{ color: colors.text, fontSize: 17 }}>
                       {item.label}
                     </Text>
                   </TouchableOpacity>
@@ -200,40 +200,225 @@ export default function AddScreen({ navigation }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: colors.inputBackground,
-              color: colors.text,
-              borderColor: colors.inputBorder,
-            },
-          ]}
-          value={url}
-          onChangeText={setUrl}
-          placeholder="https://example.com"
-          placeholderTextColor={colors.label}
-          autoCapitalize="none"
-        />
-        <TouchableOpacity
-          style={[styles.buttonGray, { backgroundColor: colors.button }]}
-          onPress={fetchPreview}
-        >
-          <Text style={[styles.buttonText, { color: colors.buttonText }]}>Fetch Preview</Text>
-        </TouchableOpacity>
-        {loading && (
-          <Text style={[styles.loadingText, { color: colors.label }]}>Loading preview...</Text>
-        )}
-        {previewError ? (
-          <Text style={{ color: '#d72660', fontFamily: 'Quicksand', marginTop: 10 }}>
-            {previewError}
-          </Text>
-        ) : null}
-
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+      >
         {preview.url ? (
-          <View style={[styles.preview, { backgroundColor: colors.card }]}>
-            <Text style={[styles.label, { color: colors.label }]}>Title:</Text>
+          Platform.OS === 'web' ? (
+            <View
+              style={[
+                styles.preview,
+                { backgroundColor: colors.card },
+                { width: 400, alignSelf: 'center', height: 650, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+              ]}
+            >
+              <ScrollView
+                style={{ flex: 1, minHeight: 0 }}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                showsVerticalScrollIndicator
+              >
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      color: colors.text,
+                      borderColor: colors.inputBorder,
+                    },
+                  ]}
+                  value={preview.title}
+                  onChangeText={(text) => setPreview({ ...preview, title: text })}
+                />
+
+                {(preview.image || localImage) ? (
+                  <Image
+                    source={{ uri: localImage || preview.image }}
+                    style={styles.image}
+                  />
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.buttonGray, { backgroundColor: colors.button }]}
+                  onPress={pickImage}
+                >
+                  <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+                    Swap / Upload Image
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={[styles.label, { color: colors.text }]}>Tags (type and press space):</Text>
+                <ScrollView
+                  horizontal
+                  contentContainerStyle={{ alignItems: 'center' }}
+                  showsHorizontalScrollIndicator={false}
+                >
+                  <View style={styles.tagsRow}>
+                    {tags.map((tag, idx) => (
+                      <View
+                        key={idx}
+                        style={[styles.tagBubble, { backgroundColor: colors.tag }]}
+                      >
+                        <Text style={[styles.tagText, { color: colors.text }]}>{tag}</Text>
+                        <Text
+                          style={[styles.tagRemove, { color: colors.label }]}
+                          onPress={() => removeTag(tag)}
+                        >
+                          ×
+                        </Text>
+                      </View>
+                    ))}
+                    <TextInput
+                      style={[
+                        styles.tagInput,
+                        {
+                          backgroundColor: colors.inputBackground,
+                          color: colors.text,
+                          borderColor: colors.inputBorder,
+                        },
+                      ]}
+                      value={tagInput}
+                      onChangeText={handleTagInput}
+                      placeholder="Add tag"
+                      placeholderTextColor={colors.label}
+                      autoCapitalize="none"
+                    />
+                  </View>
+                </ScrollView>
+
+                <Text style={[styles.label, { color: colors.text }]}>Select Folder:</Text>
+                <CustomPicker
+                  value={selectedFolder}
+                  options={[
+                    { label: 'None', value: null },
+                    ...folders.map(f => ({ label: f.name, value: String(f.id) })),
+                  ]}
+                  onChange={val => setSelectedFolder(val)}
+                  colors={colors}
+                />
+
+                <TouchableOpacity
+                  style={[styles.buttonGray, { backgroundColor: colors.button }]}
+                  onPress={saveBookmark}
+                  disabled={!preview.url && !url}
+                >
+                  <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+                    Save Bookmark
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          ) : (
+            <KeyboardAvoidingView
+              style={[styles.preview, { backgroundColor: colors.card, flex: 1 }]}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+            >
+              <ScrollView
+                style={{ flex: 1, minHeight: 0 }}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                showsVerticalScrollIndicator
+              >
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      color: colors.text,
+                      borderColor: colors.inputBorder,
+                    },
+                  ]}
+                  value={preview.title}
+                  onChangeText={(text) => setPreview({ ...preview, title: text })}
+                />
+
+                {(preview.image || localImage) ? (
+                  <Image
+                    source={{ uri: localImage || preview.image }}
+                    style={styles.image}
+                  />
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.buttonGray, { backgroundColor: colors.button }]}
+                  onPress={pickImage}
+                >
+                  <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+                    Swap / Upload Image
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={[styles.label, { color: colors.text }]}>Tags (type and press space):</Text>
+                <ScrollView
+                  horizontal
+                  contentContainerStyle={{ alignItems: 'center' }}
+                  showsHorizontalScrollIndicator={false}
+                >
+                  <View style={styles.tagsRow}>
+                    {tags.map((tag, idx) => (
+                      <View
+                        key={idx}
+                        style={[styles.tagBubble, { backgroundColor: colors.tag }]}
+                      >
+                        <Text style={[styles.tagText, { color: colors.text }]}>{tag}</Text>
+                        <Text
+                          style={[styles.tagRemove, { color: colors.label }]}
+                          onPress={() => removeTag(tag)}
+                        >
+                          ×
+                        </Text>
+                      </View>
+                    ))}
+                    <TextInput
+                      style={[
+                        styles.tagInput,
+                        {
+                          backgroundColor: colors.inputBackground,
+                          color: colors.text,
+                          borderColor: colors.inputBorder,
+                        },
+                      ]}
+                      value={tagInput}
+                      onChangeText={handleTagInput}
+                      placeholder="Add tag"
+                      placeholderTextColor={colors.label}
+                      autoCapitalize="none"
+                    />
+                  </View>
+                </ScrollView>
+
+                <Text style={[styles.label, { color: colors.text }]}>Select Folder:</Text>
+                <CustomPicker
+                  value={selectedFolder}
+                  options={[
+                    { label: 'None', value: null },
+                    ...folders.map(f => ({ label: f.name, value: String(f.id) })),
+                  ]}
+                  onChange={val => setSelectedFolder(val)}
+                  colors={colors}
+                />
+
+                <TouchableOpacity
+                  style={[styles.buttonGray, { backgroundColor: colors.button }]}
+                  onPress={saveBookmark}
+                  disabled={!preview.url && !url}
+                >
+                  <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+                    Save Bookmark
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          )
+        ) : (
+          <ScrollView
+            contentContainerStyle={[
+              styles.container,
+              { backgroundColor: colors.background, ...(Platform.OS === 'web' ? { maxWidth: 450, alignSelf: 'center' } : {}) },
+            ]}
+            scrollEnabled={Platform.OS !== 'web'}
+          >
             <TextInput
               style={[
                 styles.input,
@@ -241,74 +426,32 @@ export default function AddScreen({ navigation }) {
                   backgroundColor: colors.inputBackground,
                   color: colors.text,
                   borderColor: colors.inputBorder,
+                  ...(Platform.OS === 'web' ? { width: 400, alignSelf: 'center' } : {}),
                 },
               ]}
-              value={preview.title}
-              onChangeText={(text) => setPreview({ ...preview, title: text })}
+              value={url}
+              onChangeText={setUrl}
+              placeholder="https://example.com"
+              placeholderTextColor={colors.label}
+              autoCapitalize="none"
             />
-
-            {(preview.image || localImage) ? (
-              <Image
-                source={{ uri: localImage || preview.image }}
-                style={styles.image}
-              />
+            <TouchableOpacity
+              style={[styles.buttonGray, { backgroundColor: colors.button }]}
+              onPress={fetchPreview}
+            >
+              <Text style={[styles.buttonText, { color: colors.buttonText }]}>Fetch Preview</Text>
+            </TouchableOpacity>
+            {loading && (
+              <Text style={[styles.loadingText, { color: colors.text }]}>Loading preview...</Text>
+            )}
+            {previewError ? (
+              <Text style={{ color: colors.text, fontFamily: 'Quicksand', marginTop: 10 }}>
+                {previewError}
+              </Text>
             ) : null}
-            <TouchableOpacity
-              style={[styles.buttonGray, { backgroundColor: colors.button }]}
-              onPress={pickImage}
-            >
-              <Text style={[styles.buttonText, { color: colors.buttonText }]}>Swap / Upload Image</Text>
-            </TouchableOpacity>
-
-            <Text style={[styles.label, { color: colors.label }]}>Tags (type and press space):</Text>
-            <View style={styles.tagsRow}>
-              {tags.map((tag, idx) => (
-                <View key={idx} style={[styles.tagBubble, { backgroundColor: colors.tag }]}>
-                  <Text style={[styles.tagText, { color: colors.tagText }]}>{tag}</Text>
-                  <Text
-                    style={[styles.tagRemove, { color: colors.label }]}
-                    onPress={() => removeTag(tag)}
-                  > × </Text>
-                </View>
-              ))}
-              <TextInput
-                style={[
-                  styles.tagInput,
-                  {
-                    backgroundColor: colors.inputBackground,
-                    color: colors.text,
-                    borderColor: colors.inputBorder,
-                  },
-                ]}
-                value={tagInput}
-                onChangeText={handleTagInput}
-                placeholder="Add tag"
-                placeholderTextColor={colors.label}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <Text style={[styles.label, { color: colors.label }]}>Select Folder:</Text>
-            <CustomPicker
-              value={selectedFolder}
-              options={[
-                { label: 'None', value: null },
-                ...folders.map(f => ({ label: f.name, value: String(f.id) })),
-              ]}
-              onChange={val => setSelectedFolder(val)}
-              colors={colors}
-            />
-
-            <TouchableOpacity
-              style={[styles.buttonGray, { backgroundColor: colors.button }]}
-              onPress={saveBookmark}
-              disabled={!preview.url && !url}
-            >
-              <Text style={[styles.buttonText, { color: colors.buttonText }]}>Save Bookmark</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-      </ScrollView>
+          </ScrollView>
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -355,9 +498,9 @@ const styles = StyleSheet.create({
   },
   tagsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginVertical: 8,
     alignItems: 'center',
+    marginVertical: 0,
+    // No height, no flexWrap here—set flexWrap inline above
   },
   tagBubble: {
     flexDirection: 'row',

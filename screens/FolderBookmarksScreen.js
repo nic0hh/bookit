@@ -1,6 +1,6 @@
 // screens/FolderBookmarksScreen.js
 import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useContext, useState, useEffect, useRef } from 'react';
+import React, { useContext, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { View, Text, TextInput, Image, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import MasonryList from '@react-native-seoul/masonry-list';
 import { BookmarksContext } from '../context/BookmarksContext';
@@ -19,7 +19,7 @@ function shuffleArray(array) {
 export default function FolderBookmarksScreen({ navigation, route }) {
   const { folderId, folderName } = route.params;
   const { bookmarks } = useContext(BookmarksContext);
-  const { colors } = useContext(ThemeContext);
+  const { colors, setThemeName } = useContext(ThemeContext);
   const [searchQuery, setSearchQuery] = useState('');
   const [shuffledBookmarks, setShuffledBookmarks] = useState([]);
   const [filteredBookmarks, setFilteredBookmarks] = useState([]);
@@ -61,7 +61,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
     if (Platform.OS === 'web') {
       function updateCardWidth() {
         const columns = 5;
-        const gutter = 8;
+        const gutter = 15;
         const totalGutter = gutter * (columns + 1);
         const width = Math.max(
           140,
@@ -74,6 +74,29 @@ export default function FolderBookmarksScreen({ navigation, route }) {
       return () => window.removeEventListener('resize', updateCardWidth);
     }
   }, []);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: folderName,
+      headerTitleStyle: {
+        color: colors.text,
+        fontFamily: 'Quicksand',
+        fontWeight: 'bold',
+        fontSize: 18,
+      },
+      headerStyle: {
+        backgroundColor: colors.background,
+      },
+      headerLeft: () => (
+        <TouchableOpacity
+          style={{ paddingHorizontal: 16 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, folderName, colors.text, colors.background]);
 
   const renderBookmark = ({ item }) => (
     <TouchableOpacity
@@ -95,7 +118,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
                     item.imageWidth && item.imageHeight
                       ? item.imageWidth / item.imageHeight
                       : 1.5,
-                  height: item.imageWidth && item.imageHeight ? undefined : 300, // taller fallback
+                  height: item.imageWidth && item.imageHeight ? undefined : 300,
                 }
               : { height: item.height || 200 },
           ]}
@@ -106,6 +129,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
         </View>
       )}
       <Text style={[styles.title, { color: colors.text }]}>{item?.title || 'Untitled'}</Text>
+      {/* REMOVE or comment out this block to hide tags:
       {item?.tags?.length > 0 && (
         <View style={styles.tagsContainer}>
           {item.tags.map((tag, idx) => (
@@ -124,6 +148,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
           ))}
         </View>
       )}
+      */}
     </TouchableOpacity>
   );
 

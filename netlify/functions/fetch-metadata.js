@@ -1,14 +1,27 @@
-
 const cheerio = require('cheerio');
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Content-Type': 'application/json'
+};
+
 exports.handler = async function(event) {
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: ''
+    };
+  }
+
   console.log('fetch-metadata invoked', event.queryStringParameters);
   const url = (event.queryStringParameters && event.queryStringParameters.url) || '';
   if (!url || !/^https?:\/\//i.test(url)) {
     return {
       statusCode: 400,
       body: JSON.stringify({ error: 'Invalid or missing URL' }),
-      headers: { 'Content-Type': 'application/json' }
+      headers: corsHeaders
     };
   }
 
@@ -43,14 +56,14 @@ exports.handler = async function(event) {
     return {
       statusCode: 200,
       body: JSON.stringify({ title, image, description }),
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' }
+      headers: corsHeaders
     };
   } catch (e) {
     console.error('fetch-metadata error', e);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Failed to fetch metadata' }),
-      headers: { 'Content-Type': 'application/json' }
+      headers: corsHeaders
     };
   }
 };

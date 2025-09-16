@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -173,6 +173,10 @@ function AppInner() {
           },
           tabBarActiveTintColor: colors.text,
           tabBarInactiveTintColor: colors.label,
+          // 👇 Add this for web only
+          tabBarItemStyle: Platform.OS === 'web'
+            ? { marginHorizontal: -12 } // negative margin brings icons closer
+            : {},
         })}
       >
         <Tab.Screen

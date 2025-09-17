@@ -1,13 +1,11 @@
 // App.js
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text, ActivityIndicator, Platform } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text, ActivityIndicator, Platform, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useFonts } from 'expo-font';
-import * as SplashScreen from 'expo-splash-screen';
 
 import HomeScreen from './screens/HomeScreen';
 import AddScreen from './screens/AddScreen';
@@ -19,8 +17,6 @@ import { ThemeProvider, ThemeContext } from './ThemeContext';
 import { DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import AuthScreen from './screens/AuthScreen';
-
-SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -66,6 +62,8 @@ function HomeStack() {
 const RootStack = createNativeStackNavigator();
 
 function MainTabs() {
+  const { colors } = useContext(ThemeContext);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -83,16 +81,16 @@ function MainTabs() {
         },
         tabBarStyle: Platform.OS === 'web'
           ? {
-              backgroundColor: colors.card,
+              backgroundColor: colors.bottomBar, // 👈 use theme bottomBar color
               borderTopColor: colors.inputBorder,
               height: 56,
               paddingHorizontal: 0,
               justifyContent: 'center',
               display: 'flex',
-              gap: 0, // 👈 This will bring icons closer together on web
+              gap: 0,
             }
           : {
-              backgroundColor: colors.card,
+              backgroundColor: colors.bottomBar, // 👈 use theme bottomBar color
               borderTopColor: colors.inputBorder,
             },
         tabBarItemStyle: Platform.OS === 'web'
@@ -126,10 +124,10 @@ function MainTabs() {
 }
 
 function AppInner() {
-  const { colors, colorScheme } = React.useContext(ThemeContext);
+  const { colors, themeName } = useContext(ThemeContext);
 
   const navTheme = React.useMemo(() => {
-    const base = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
+    const base = themeName === 'dark' ? DarkTheme : DefaultTheme;
     return {
       ...base,
       colors: {
@@ -142,7 +140,7 @@ function AppInner() {
         notification: colors.tag,
       },
     };
-  }, [colors, colorScheme]);
+  }, [colors, themeName]);
 
   const { migrating } = useContext(BookmarksContext);
 
@@ -152,10 +150,10 @@ function AppInner() {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fff'
+        backgroundColor: colors.background
       }}>
-        <ActivityIndicator size="large" color="#d72660" />
-        <Text style={{ marginTop: 18, fontSize: 18, color: '#d72660', fontFamily: 'Quicksand' }}>
+        <ActivityIndicator size="large" color={colors.tag} />
+        <Text style={{ marginTop: 18, fontSize: 18, color: colors.tag }}>
           Migrating your bookmarks...
         </Text>
       </View>
@@ -164,72 +162,24 @@ function AppInner() {
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => {
-            let iconName;
-            switch (route.name) {
-              case 'Home':
-                iconName = 'home-outline';
-                break;
-              case 'Add':
-                iconName = 'add-circle-outline';
-                break;
-              case 'Folders':
-                iconName = 'folder-outline';
-                break;
-              default:
-                iconName = 'ellipse-outline';
-            }
-            return <Ionicons name={iconName} size={size} color={color} />;
-          },
-          tabBarStyle: Platform.OS === 'web'
-            ? {
-                backgroundColor: colors.card,
-                borderTopColor: colors.inputBorder,
-                height: 56,
-                paddingHorizontal: 0,
-                justifyContent: 'center',
-                display: 'flex',
-                gap: 0, // 👈 This will bring icons closer together on web
-              }
-            : {
-                backgroundColor: colors.card,
-                borderTopColor: colors.inputBorder,
-              },
-          tabBarItemStyle: Platform.OS === 'web'
-            ? {}
-            : {},
-          tabBarActiveTintColor: colors.text,
-          tabBarInactiveTintColor: colors.label,
-        })}
-      >
-        <Tab.Screen
-          name="Home"
-          component={HomeStack}
-          options={{
-            unmountOnBlur: true,
-          }}
-        />
-        <Tab.Screen name="Add" component={AddScreen} />
-        <Tab.Screen name="Folders" component={FoldersScreen} />
-      </Tab.Navigator>
+      <MainTabs />
     </NavigationContainer>
   );
 }
 
 function RootGate() {
-  const { user, initializing, isVerified } = React.useContext(AuthContext);
+  const { user, initializing, isVerified } = useContext(AuthContext);
+  const { colors } = useContext(ThemeContext);
+
   if (initializing) return null;
   if (!user) return <AuthScreen />;
   if (!isVerified) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <Text style={{ fontSize: 18, color: '#d72660', fontFamily: 'Quicksand', marginBottom: 18 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <Text style={{ fontSize: 18, color: colors.tag, marginBottom: 18 }}>
           Please verify your email address to continue.
         </Text>
-        <Text style={{ color: '#888', fontFamily: 'Quicksand', textAlign: 'center', marginBottom: 18 }}>
+        <Text style={{ color: colors.label, textAlign: 'center', marginBottom: 18 }}>
           Check your inbox for a verification link.
         </Text>
         <TouchableOpacity
@@ -238,9 +188,9 @@ function RootGate() {
             await supabase.auth.resend({ type: 'signup', email: user.email });
             Alert.alert('Verification email sent', 'Check your inbox.');
           }}
-          style={{ backgroundColor: '#d72660', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
+          style={{ backgroundColor: colors.tag, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
         >
-          <Text style={{ color: '#fff', fontFamily: 'Quicksand', fontSize: 16 }}>Resend Email</Text>
+          <Text style={{ color: colors.card, fontSize: 16 }}>Resend Email</Text>
         </TouchableOpacity>
       </View>
     );
@@ -249,25 +199,6 @@ function RootGate() {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
-    Quicksand: require('./assets/fonts/Quicksand-Regular.ttf'),
-    'Quicksand-Bold': require('./assets/fonts/Quicksand-Bold.ttf'),
-  });
-
-  React.useEffect(() => {
-    if (fontsLoaded) {
-      Text.defaultProps = Text.defaultProps || {};
-      Text.defaultProps.style = [{ fontFamily: 'Quicksand', color: '#222' }, Text.defaultProps.style];
-
-      TextInput.defaultProps = TextInput.defaultProps || {};
-      TextInput.defaultProps.style = [{ fontFamily: 'Quicksand' }, TextInput.defaultProps.style];
-
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded]);
-
-  if (!fontsLoaded) return null;
-
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -298,9 +229,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   buttonText: {
-    fontWeight: 'bold',
     fontSize: 16,
-    fontFamily: 'Quicksand-Bold',
     color: '#858585',
   },
 });

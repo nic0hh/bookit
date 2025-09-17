@@ -80,7 +80,6 @@ export default function FolderBookmarksScreen({ navigation, route }) {
       title: folderName,
       headerTitleStyle: {
         color: colors.text,
-        fontFamily: 'Quicksand',
         fontWeight: 'bold',
         fontSize: 18,
       },
@@ -102,7 +101,11 @@ export default function FolderBookmarksScreen({ navigation, route }) {
     <TouchableOpacity
       style={[
         styles.card,
-        { backgroundColor: colors.card },
+        { 
+          backgroundColor: colors.card,
+          borderWidth: 0.7,
+          borderColor: colors.cardBorder,
+        },
         Platform.OS === 'web' ? { width: cardWidth } : {},
       ]}
       onPress={() => navigation.navigate('BookmarkDetail', { bookmark: item })}
@@ -137,7 +140,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
               key={idx}
               style={[
                 styles.tag,
-                { backgroundColor: colors.tag, color: colors.tagText, fontFamily: 'Quicksand' },
+                { backgroundColor: colors.tag, color: colors.tagText },
                 searchQuery.toLowerCase().includes(tag.toLowerCase())
                   ? [styles.tagHighlighted, { backgroundColor: colors.gray, color: colors.background }]
                   : null
@@ -154,7 +157,6 @@ export default function FolderBookmarksScreen({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-    
       <TextInput
         style={[
           styles.searchInput,
@@ -176,6 +178,13 @@ export default function FolderBookmarksScreen({ navigation, route }) {
         numColumns={Platform.OS === 'web' ? 5 : 2}
         contentContainerStyle={styles.listContent}
       />
+      {/* Remove or comment out this block:
+      <TouchableOpacity style={{ backgroundColor: colors.button, borderRadius: 12, padding: 12 }}>
+        <Text style={{ color: colors.buttonText, fontSize: 16, fontWeight: 'bold' }}>
+          Add Bookmark
+        </Text>
+      </TouchableOpacity>
+      */}
     </View>
   );
 }
@@ -190,7 +199,6 @@ const styles = StyleSheet.create({
   topBarTitle: {
     fontWeight: 'bold',
     fontSize: 18,
-    fontFamily: 'Quicksand',
   },
   searchInput: {
     height: 40,
@@ -198,10 +206,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 15,
     fontSize: 16,
-    fontFamily: 'Quicksand',
     margin: 10,
-    marginTop: 10,    // add this for spacing below header
-    marginBottom: 0,  // remove extra space below search bar
+    marginTop: 10,
+    marginBottom: 0,
   },
   card: {
     margin: 8,
@@ -227,9 +234,9 @@ const styles = StyleSheet.create({
   title: {
     padding: 12,
     fontSize: 18,
-    fontWeight: 'bold',
     letterSpacing: 0.5,
-    fontFamily: 'Quicksand',
+    fontWeight: 'normal',
+    textAlign: 'center',
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -244,11 +251,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontSize: 14,
     fontWeight: 'bold',
-    fontFamily: 'Quicksand',
   },
-  tagHighlighted: {
-    fontFamily: 'Quicksand',
-  },
+  tagHighlighted: {},
   listContent: {
     padding: 10,
   },

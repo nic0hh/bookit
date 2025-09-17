@@ -96,7 +96,11 @@ const renderBookmark = ({ item }) => (
   <TouchableOpacity
     style={[
       styles.card,
-      { backgroundColor: colors.card },
+      { 
+        backgroundColor: colors.card,
+        borderWidth: 0.7, // 👈 add border
+        borderColor: colors.cardBorder, // 👈 use theme border color
+      },
       Platform.OS === 'web'
         ? { width: cardWidth, margin: 12 } // 👈 reduce from 20 to 12 for web
         : { margin: 8 },
@@ -132,7 +136,6 @@ const renderBookmark = ({ item }) => (
         { 
           color: colors.text,
           fontSize: 17,
-          fontWeight: 'bold',
         }
       ]}
     >
@@ -145,7 +148,7 @@ const renderBookmark = ({ item }) => (
             key={idx}
             style={[
               styles.tag,
-              { backgroundColor: colors.tag, color: colors.tagText, fontFamily: 'Quicksand' },
+              { backgroundColor: colors.tag, color: colors.tagText },
               searchQuery.toLowerCase().includes(tag.toLowerCase())
                 ? [styles.tagHighlighted, { backgroundColor: colors.gray, color: colors.background }]
                 : null
@@ -222,7 +225,7 @@ const renderBookmark = ({ item }) => (
                 Theme
               </Text>
 
-              {['light', 'dark', 'softPink', 'green', 'softOrange'].map(t => (
+              {['light', 'dark', 'Pink', 'green', 'Orange'].map(t => (
                 <TouchableOpacity
                   key={t}
                   style={{
@@ -303,11 +306,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 15,
     fontSize: 16,
-    fontFamily: 'Quicksand',
     marginBottom: 0,
+    // No fontFamily
   },
   card: {
-    margin: 8, // 👈 reduce default margin
+    margin: 8,
     borderRadius: 18,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -330,10 +333,10 @@ const styles = StyleSheet.create({
   title: {
     padding: 12,
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: 'normal',
     letterSpacing: 0.5,
-    fontFamily: 'Quicksand',
     textAlign: 'center',
+    // No fontFamily
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -348,11 +351,11 @@ const styles = StyleSheet.create({
     marginRight: 6,
     marginBottom: 6,
     fontSize: 14,
-    fontWeight: 'bold',
-    fontFamily: 'Quicksand',
+    fontWeight: 'normal',
+    // No fontFamily
   },
   tagHighlighted: {
-    fontFamily: 'Quicksand',
+    // No fontFamily
   },
   listContent: {
     padding: 10,

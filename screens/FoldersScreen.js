@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { ThemeContext } from '../ThemeContext';
@@ -57,17 +57,17 @@ export default function FoldersScreen({ navigation }) {
     if (error) {
       Alert.alert('Error', error);
     } else {
-      setEditModalVisible(false); // or navigation.goBack()
+      setEditModalVisible(false);
     }
   };
 
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
-      edges={['top']} // 👈 only apply safe area to the top
+      edges={['top']}
     >
       {loadingRemote && (
-        <ActivityIndicator style={{ marginTop: 10 }} color={colors.label} />
+        <ActivityIndicator style={{ marginTop: 40 }} color={colors.label} />
       )}
 
       <FlatList
@@ -75,6 +75,7 @@ export default function FoldersScreen({ navigation }) {
         keyExtractor={item => item.id}
         contentContainerStyle={{
           paddingHorizontal: 16,
+          paddingTop: 40, // 👈 add this line to move folders down
         }}
         renderItem={({ item, index }) => (
           <TouchableOpacity
@@ -89,7 +90,7 @@ export default function FoldersScreen({ navigation }) {
             style={{
               backgroundColor: colors.card,
               borderRadius: 18,
-              padding: 18,
+              padding: 16,
               marginBottom: 12,
               ...(index === 0 ? { marginTop: 8 } : {}),
               shadowColor: '#000',
@@ -97,7 +98,62 @@ export default function FoldersScreen({ navigation }) {
               shadowOpacity: 0.1,
               shadowRadius: 8,
               elevation: 4,
-              // 👇 Web-only styles
+              borderWidth: 0.7, // 👈 add border
+              borderColor: colors.actionButtonText, // 👈 use actionButtonText color for border
+              ...(Platform.OS === 'web'
+                ? {
+                    maxWidth: 340,
+                    alignSelf: 'center',
+                    width: '100%',
+                  }
+                : {
+                    maxWidth: 280,         // 👈 shorter on app
+                    alignSelf: 'center',   // 👈 center on app
+                    width: '100%',
+                  }),
+            }}
+          >
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: 17,
+                fontWeight: 'bold',
+                textAlign: 'center',
+              }}
+            >
+              {item.name}
+            </Text>
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={
+          !loadingRemote ? (
+            <Text style={{ color: colors.label, textAlign: 'center', marginTop: 40 }}>
+              No folders yet
+            </Text>
+          ) : null
+        }
+      />
+
+      {/* Input bar stays flush at the bottom */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+      >
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderColor: colors.inputBorder,
+            backgroundColor: colors.background,
+            paddingVertical: 10,
+            paddingHorizontal: 12,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              // 👇 Web-only: center and shrink
               ...(Platform.OS === 'web'
                 ? {
                     maxWidth: 340,
@@ -107,102 +163,63 @@ export default function FoldersScreen({ navigation }) {
                 : {}),
             }}
           >
-            <Text
+            <TextInput
+              value={newFolder}
+              onChangeText={setNewFolder}
+              placeholder="New folder name"
+              placeholderTextColor={colors.label}
               style={{
+                flex: 1,
+                backgroundColor: colors.inputBackground,
+                borderWidth: 1,
+                borderColor: colors.inputBorder,
+                borderRadius: 14,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
                 color: colors.text,
-                fontFamily: 'Quicksand',
-                fontSize: 17,                // 👈 updated font size
-                fontWeight: 'bold',          // 👈 make it bold
-                ...(Platform.OS === 'web' ? { textAlign: 'center' } : {}),
+                fontSize: 15,
+                ...(Platform.OS === 'web'
+                  ? {
+                      minWidth: 0,
+                      maxWidth: 180,
+                    }
+                  : {}),
+              }}
+            />
+            <TouchableOpacity
+              onPress={createFolder}
+              disabled={!newFolder.trim()}
+              style={{
+                marginLeft: 10,
+                backgroundColor: colors.actionButton, // use actionButton color
+                borderRadius: 12,
+                paddingHorizontal: 18,
+                paddingVertical: 12,
+                opacity: newFolder.trim() ? 1 : 0.5,
+                borderWidth: 0.7, // add border
+                borderColor: colors.actionButtonText, // use actionButtonText color for border
+                ...(Platform.OS === 'web'
+                  ? {
+                      minWidth: 0,
+                      maxWidth: 80,
+                      paddingHorizontal: 12,
+                    }
+                  : {}),
               }}
             >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          !loadingRemote ? (
-            <Text style={{ color: colors.label, textAlign: 'center', marginTop: 40, fontFamily: 'Quicksand' }}>
-              No folders yet
-            </Text>
-          ) : null
-        }
-      />
-
-      {/* Input bar stays flush at the bottom */}
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderColor: colors.inputBorder,
-          backgroundColor: colors.background,
-          paddingVertical: 10,
-          paddingHorizontal: 12,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            // 👇 Web-only: center and shrink
-            ...(Platform.OS === 'web'
-              ? {
-                  maxWidth: 340,
-                  alignSelf: 'center',
-                  width: '100%',
-                }
-              : {}),
-          }}
-        >
-          <TextInput
-            value={newFolder}
-            onChangeText={setNewFolder}
-            placeholder="New folder name"
-            placeholderTextColor={colors.label}
-            style={{
-              flex: 1,
-              backgroundColor: colors.inputBackground,
-              borderWidth: 1,
-              borderColor: colors.inputBorder,
-              borderRadius: 14,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              fontFamily: 'Quicksand',
-              color: colors.text,
-              ...(Platform.OS === 'web'
-                ? {
-                    fontSize: 15,
-                    minWidth: 0,
-                    maxWidth: 180,
-                  }
-                : {}),
-            }}
-          />
-          <TouchableOpacity
-            onPress={createFolder}
-            disabled={!newFolder.trim()}
-            style={{
-              marginLeft: 10,
-              backgroundColor: colors.button,
-              borderRadius: 12,
-              paddingHorizontal: 18,
-              paddingVertical: 12,
-              opacity: newFolder.trim() ? 1 : 0.5,
-              ...(Platform.OS === 'web'
-                ? {
-                    minWidth: 0,
-                    maxWidth: 80,
-                    paddingHorizontal: 12,
-                  }
-                : {}),
-            }}
-          >
-            <Text style={{ fontFamily: 'Quicksand', color: colors.buttonText, ...(Platform.OS === 'web' ? { fontSize: 15 } : {}) }}>
-              Add
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={{
+                  color: colors.actionButtonText, // use actionButtonText color for text
+                  fontSize: 15,
+                  fontWeight: 'bold',
+                }}
+              >
+                Add
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
 
       {editModalVisible && (
         <View
@@ -228,7 +245,7 @@ export default function FoldersScreen({ navigation }) {
               elevation: 8,
             }}
           >
-            <Text style={{ fontFamily: 'Quicksand', fontSize: 16, marginBottom: 12, color: colors.text }}>
+            <Text style={{ fontSize: 16, marginBottom: 12, color: colors.text, fontWeight: 'bold' }}>
               Edit folder name
             </Text>
             <TextInput
@@ -241,9 +258,9 @@ export default function FoldersScreen({ navigation }) {
                 borderRadius: 12,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
-                fontFamily: 'Quicksand',
                 color: colors.text,
                 marginBottom: 16,
+                fontSize: 15,
               }}
               placeholder="Folder name"
               placeholderTextColor={colors.label}
@@ -253,14 +270,18 @@ export default function FoldersScreen({ navigation }) {
                 onPress={() => setEditModalVisible(false)}
                 style={{ marginRight: 12 }}
               >
-                <Text style={{ color: colors.label, fontFamily: 'Quicksand', fontSize: 15 }}>Cancel</Text>
+                <Text style={{ color: colors.label, fontSize: 15 }}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSave}
                 style={{ backgroundColor: colors.button, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 }}
                 disabled={!editName.trim()}
               >
-                <Text style={{ color: colors.buttonText, fontFamily: 'Quicksand', fontSize: 15 }}>Save</Text>
+                <Text style={{ color: colors.buttonText, fontSize: 15, fontWeight: 'bold' }}>
+                  Save
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

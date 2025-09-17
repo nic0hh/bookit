@@ -1,5 +1,15 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
+import { createClient } from '@supabase/supabase-js';
+
+export const supabase = createClient(
+  'https://zzhwzeartfukqlytbmqq.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6aHd6ZWFydGZ1a3FseXRibXFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1ODgzNjIsImV4cCI6MjA3MzE2NDM2Mn0.vbnnK1uDi4qU81z6umtE25hhuCUEVD1q4kMBOvIEyH4',
+  {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+  }
+);
 
 export const AuthContext = createContext();
 
@@ -8,19 +18,20 @@ export function AuthProvider({ children }) {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    // Get current session on mount
-    const session = supabase.auth.getSession().then(({ data }) => {
+    const getSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
       setUser(data?.session?.user || null);
       setInitializing(false);
-    });
+    };
+    getSession();
 
-    // Listen for auth changes
+    // Optionally, listen for auth state changes
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
     });
 
     return () => {
-      listener?.subscription?.unsubscribe?.();
+      listener?.subscription?.unsubscribe();
     };
   }, []);
 

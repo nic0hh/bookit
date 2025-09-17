@@ -240,10 +240,17 @@ export default function AddScreen({ navigation }) {
                 ) : null}
 
                 <TouchableOpacity
-                  style={[styles.buttonGray, { backgroundColor: colors.button }]}
+                  style={[
+                    styles.buttonGray,
+                    {
+                      backgroundColor: colors.actionButton,
+                      borderWidth: 0.7,
+                      borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
+                    }
+                  ]}
                   onPress={pickImage}
                 >
-                  <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+                  <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
                     Swap / Upload Image
                   </Text>
                 </TouchableOpacity>
@@ -299,11 +306,18 @@ export default function AddScreen({ navigation }) {
                 />
 
                 <TouchableOpacity
-                  style={[styles.buttonGray, { backgroundColor: colors.button }]}
+                  style={[
+                    styles.buttonGray,
+                    {
+                      backgroundColor: colors.actionButton,
+                      borderWidth: 0.7,
+                      borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
+                    }
+                  ]}
                   onPress={saveBookmark}
                   disabled={!preview.url && !url}
                 >
-                  <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+                  <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
                     Save Bookmark
                   </Text>
                 </TouchableOpacity>
@@ -341,10 +355,17 @@ export default function AddScreen({ navigation }) {
                 ) : null}
 
                 <TouchableOpacity
-                  style={[styles.buttonGray, { backgroundColor: colors.button }]}
+                  style={[
+                    styles.buttonGray,
+                    {
+                      backgroundColor: colors.actionButton,
+                      borderWidth: 0.7,
+                      borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
+                    }
+                  ]}
                   onPress={pickImage}
                 >
-                  <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+                  <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
                     Swap / Upload Image
                   </Text>
                 </TouchableOpacity>
@@ -400,11 +421,18 @@ export default function AddScreen({ navigation }) {
                 />
 
                 <TouchableOpacity
-                  style={[styles.buttonGray, { backgroundColor: colors.button }]}
+                  style={[
+                    styles.buttonGray,
+                    {
+                      backgroundColor: colors.actionButton,
+                      borderWidth: 0.7,
+                      borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
+                    }
+                  ]}
                   onPress={saveBookmark}
                   disabled={!preview.url && !url}
                 >
-                  <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+                  <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
                     Save Bookmark
                   </Text>
                 </TouchableOpacity>
@@ -436,10 +464,19 @@ export default function AddScreen({ navigation }) {
               autoCapitalize="none"
             />
             <TouchableOpacity
-              style={[styles.buttonGray, { backgroundColor: colors.button }]}
+              style={[
+                styles.buttonGray,
+                {
+                  backgroundColor: colors.actionButton, // 👈 switched: use actionButtonText as background
+                  borderWidth: 0.7,
+                  borderColor: colors.actionButtonText,         // optional: add border for contrast
+                }
+              ]}
               onPress={fetchPreview}
             >
-              <Text style={[styles.buttonText, { color: colors.buttonText }]}>Fetch Preview</Text>
+              <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
+                Fetch Preview
+              </Text>
             </TouchableOpacity>
             {loading && (
               <Text style={[styles.loadingText, { color: colors.text }]}>Loading preview...</Text>
@@ -467,15 +504,12 @@ const styles = StyleSheet.create({
     padding: 12,
     marginVertical: 10,
     fontSize: 16,
-    fontFamily: 'Quicksand',
   },
   label: {
-    fontFamily: 'Quicksand',
     fontSize: 15,
     marginBottom: 2,
   },
   loadingText: {
-    fontFamily: 'Quicksand',
     fontSize: 15,
     marginVertical: 8,
   },
@@ -500,7 +534,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 0,
-    // No height, no flexWrap here—set flexWrap inline above
   },
   tagBubble: {
     flexDirection: 'row',
@@ -513,14 +546,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   tagText: {
-    fontFamily: 'Quicksand',
     fontSize: 15,
   },
   tagRemove: {
     marginLeft: 6,
-    fontWeight: 'bold',
     fontSize: 16,
-    fontFamily: 'Quicksand',
+    fontWeight: 'bold',
   },
   tagInput: {
     borderWidth: 1,
@@ -530,7 +561,6 @@ const styles = StyleSheet.create({
     height: 32,
     minWidth: 80,
     fontSize: 15,
-    fontFamily: 'Quicksand',
   },
   buttonGray: {
     borderRadius: 15,
@@ -540,8 +570,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   buttonText: {
-    fontWeight: 'bold',
     fontSize: 16,
-    fontFamily: 'Quicksand',
+    fontWeight: 'bold',
   },
 });

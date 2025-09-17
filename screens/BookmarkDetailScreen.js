@@ -174,8 +174,6 @@ export default function BookmarkDetailScreen({ route, navigation }) {
       title: 'Edit Bookmark',
       headerTitleStyle: {
         color: colors.text, // 👈 theme color for title
-        fontFamily: 'Quicksand',
-        fontWeight: 'bold',
         fontSize: 18,
       },
       headerStyle: {
@@ -205,10 +203,22 @@ export default function BookmarkDetailScreen({ route, navigation }) {
       <View
         style={{
           flex: 1,
-          borderTopWidth: 1,
-          borderBottomWidth: 1,
-          borderColor: colors.bookmarkBorder, // 👈 use theme color
+          borderTopWidth: Platform.OS === 'web' ? 0 : 1,      // remove top border on web
+          borderBottomWidth: Platform.OS === 'web' ? 0 : 1,   // remove bottom border on web
+          borderColor: Platform.OS === 'web' ? 'transparent' : colors.bookmarkBorder, // remove border color on web
           backgroundColor: colors.card,
+          ...(Platform.OS === 'web'
+            ? {
+                maxWidth: 420,
+                maxHeight: 850,
+                alignSelf: 'center',
+                width: '100%',
+                borderRadius: 24,
+                overflow: 'hidden',
+                marginTop: 40,
+                marginBottom: 40,
+              }
+            : {}),
         }}
       >
         <ScrollView
@@ -247,10 +257,17 @@ export default function BookmarkDetailScreen({ route, navigation }) {
             autoCapitalize="none"
           />
           <TouchableOpacity
-            style={[styles.buttonGray, { backgroundColor: colors.button }]}
+            style={[
+              styles.buttonGray,
+              {
+                backgroundColor: colors.actionButton,
+                borderWidth: 0.7,
+                borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
+              }
+            ]}
             onPress={copyUrl}
           >
-            <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+            <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
               Copy URL
             </Text>
           </TouchableOpacity>
@@ -260,10 +277,17 @@ export default function BookmarkDetailScreen({ route, navigation }) {
             <Image source={{ uri: imageUri }} style={styles.image} />
           ) : null}
           <TouchableOpacity
-            style={[styles.buttonGray, { backgroundColor: colors.button }]}
+            style={[
+              styles.buttonGray,
+              {
+                backgroundColor: colors.actionButton,      // use actionButton color
+                borderWidth: 0.7,
+                borderColor: colors.actionButtonText,      // use actionButtonText color for border
+              }
+            ]}
             onPress={pickImage}
           >
-            <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+            <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
               Swap / Upload Image
             </Text>
           </TouchableOpacity>
@@ -311,12 +335,18 @@ export default function BookmarkDetailScreen({ route, navigation }) {
           <TouchableOpacity
             style={[
               styles.buttonGray,
-              { backgroundColor: colors.button, marginTop: 12, marginBottom: 8 } // 👈 more space below, less above
+              {
+                backgroundColor: colors.actionButton,
+                borderWidth: 0.7,
+                borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
+                marginTop: 12,
+                marginBottom: 8,
+              }
             ]}
             onPress={onSave}
             disabled={saving}
           >
-            <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+            <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
               {saving ? 'Saving...' : 'Save Changes'}
             </Text>
           </TouchableOpacity>
@@ -324,7 +354,7 @@ export default function BookmarkDetailScreen({ route, navigation }) {
           <TouchableOpacity
             style={[
               styles.buttonGray,
-              { backgroundColor: '#d72660', marginTop: 5 } // 👈 remove extra space above delete button
+              { backgroundColor: '#f31919ff', marginTop: 5 } // 👈 remove extra space above delete button
             ]}
             onPress={confirmDelete}
             disabled={removing}
@@ -347,10 +377,8 @@ const styles = StyleSheet.create({
     padding: 12,
     marginVertical: 10,
     fontSize: 16,
-    fontFamily: 'Quicksand',
   },
   label: {
-    fontFamily: 'Quicksand',
     fontSize: 15,
     marginTop: 10,
     marginBottom: 4,
@@ -366,9 +394,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    alignContent: 'flex-start', // ensures rows align at the top
+    alignContent: 'flex-start',
     marginVertical: 6,
-    rowGap: 8, // add space between rows (use gap: 8 if your RN version supports it)
+    rowGap: 8,
   },
   tagBubble: {
     flexDirection: 'row',
@@ -380,13 +408,12 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   tagText: {
-    fontFamily: 'Quicksand',
     fontSize: 15,
   },
   tagRemove: {
     marginLeft: 6,
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: 'bold',
   },
   tagInput: {
     borderWidth: 1,
@@ -396,7 +423,6 @@ const styles = StyleSheet.create({
     height: 32,
     minWidth: 80,
     fontSize: 15,
-    fontFamily: 'Quicksand',
   },
   buttonGray: {
     borderRadius: 15,
@@ -405,8 +431,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   buttonText: {
-    fontWeight: 'bold',
     fontSize: 16,
-    fontFamily: 'Quicksand',
+    fontWeight: 'bold',
   },
 });

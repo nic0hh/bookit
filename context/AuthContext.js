@@ -1,9 +1,12 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
 export const supabase = createClient(
-  'https://zzhwzeartfukqlytbmqq.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6aHd6ZWFydGZ1a3FseXRibXFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1ODgzNjIsImV4cCI6MjA3MzE2NDM2Mn0.vbnnK1uDi4qU81z6umtE25hhuCUEVD1q4kMBOvIEyH4',
+  supabaseUrl,
+  supabaseAnonKey,
   {
     persistSession: true,
     autoRefreshToken: true,

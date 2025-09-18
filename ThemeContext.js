@@ -6,45 +6,45 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const themes = {
   light: {
     background: '#f5f6fa',        // very light grey background
-    text: '#222222',              // dark text for contrast
+    text: '#707070ff',              // dark text for contrast
     label: '#858585',             // muted label text
     inputBackground: '#ffffff',   // pure white input background
     inputBorder: '#e0e0e0',       // light grey border
     editInputBackground: '#f0f4f8', // subtle blue-grey for edit
     editInputBorder: '#90caf9',     // soft blue border for edit
     button: '#e0e0e0',            // light grey button
-    buttonText: '#222222',         // dark button text
+    buttonText: '#f0f0f0',         // dark button text
     card: '#ffffff',               // white card
     cardBorder: '#e0e0e0',         // light card border
-    tag: '#e3f2fd',                // pale blue tag
-    tagText: '#1976d2',            // blue tag text
-    pickerText: '#222222',         // dark picker text
+    tag: '#cdeaf7ff',                // pale blue tag
+    tagText: '#547fa3ff',            // blue tag text
+    pickerText: '#707070ff',         // dark picker text
     settingsIcon: '#858585',       // muted icon color
     bookmarkBorder: '#90caf9',     // blue accent for borders
     bottomBar: '#f0f0f0',          // very light bottom bar
-    actionButton: '#90caf9',       // blue accent for action buttons
-    actionButtonText: '#222222',   // dark text for action buttons
+    actionButton: '#f0f0f0',       // blue accent for action buttons
+    actionButtonText: '#858585',   // dark text for action buttons
   },
   dark: {
     background: '#18191A',        // deep dark background
-    text: '#E4E6EB',              // light grey text
+    text: '#a1a1a1ff',              // light grey text
     label: '#B0B3B8',             // muted label text
     inputBackground: '#242526',   // dark input background
-    inputBorder: '#3A3B3C',       // darker border
+    inputBorder: '#c76423ff',       // darker border
     editInputBackground: '#23272A',
     editInputBorder: '#3A3B3C',
     button: '#242526',            // matches input background
-    buttonText: '#B0B3B8',        // muted button text
+    buttonText: '#3b3b3bff',        // muted button text
     card: '#202124',              // slightly lighter than background
     cardBorder: '#23272A',        // subtle card border
-    tag: '#313338',               // dark tag background
-    tagText: '#E4E6EB',           // light tag text
+    tag: '#c76423ff',               // dark tag background
+    tagText: '#18191A',           // light tag text
     pickerText: '#E4E6EB',        // picker text
     settingsIcon: '#B0B3B8',      // icon color
-    bookmarkBorder: '#1976d2',    // blue accent for borders
+    bookmarkBorder: '#969696ff',    // blue accent for borders
     bottomBar: '#23272A',         // matches button/input background
-    actionButton: '#1976d2',      // blue accent for action buttons
-    actionButtonText: '#FFFFFF',  // white text for action buttons
+    actionButton: '#242526',      // blue accent for action buttons
+    actionButtonText: '#a1a1a1ff',  // white text for action buttons
   },
   Pink: {
     background: '#ffe7e7ff',

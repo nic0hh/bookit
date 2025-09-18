@@ -220,6 +220,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: '#fff',
+    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
   },
   search: {
     flex: 1,
@@ -227,9 +228,11 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     marginRight: 10,
+    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
   },
   buttonText: {
     fontSize: 16,
     color: '#858585',
+    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
   },
 });

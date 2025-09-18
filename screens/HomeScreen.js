@@ -216,14 +216,23 @@ const renderBookmark = ({ item }) => (
           <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
             <View style={{ width: '100%', alignItems: 'center' }}>
               {user?.email && (
-                <Text style={{ fontFamily: 'Quicksand', fontSize: 14, color: colors.label, marginBottom: 14 }}>
+                <Text style={{
+                  fontSize: 14,
+                  color: colors.label,
+                  marginBottom: 14,
+                  ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
+                }}>
                   {user.email}
                 </Text>
               )}
 
-              <Text style={{ fontFamily: 'Quicksand', fontSize: 18, marginBottom: 16, color: colors.label }}>
-                Theme
-              </Text>
+              {/* Top border before themes */}
+              <View style={{
+                width: '100%',
+                height: 1,
+                backgroundColor: colors.inputBorder,
+                marginBottom: 16,
+              }} />
 
               {['light', 'dark', 'Pink', 'green', 'Orange'].map(t => (
                 <TouchableOpacity
@@ -242,18 +251,25 @@ const renderBookmark = ({ item }) => (
                     setSettingsVisible(false);
                   }}
                 >
-                  <Text
-                    style={{
-                      fontFamily: 'Quicksand',
-                      fontSize: 16,
-                      color: theme === t ? colors.buttonText : colors.text,
-                      fontWeight: theme === t ? 'bold' : 'normal',
-                    }}
-                  >
+                  <Text style={{
+                    fontSize: 16,
+                    color: theme === t ? colors.buttonText : colors.text,
+                    fontWeight: theme === t ? 'bold' : 'normal',
+                    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
+                  }}>
                     {t.charAt(0).toUpperCase() + t.slice(1).replace('soft', '')}
                   </Text>
                 </TouchableOpacity>
               ))}
+
+              {/* Bottom border after themes */}
+              <View style={{
+                width: '100%',
+                height: 1,
+                backgroundColor: colors.inputBorder,
+                marginTop: 8,
+                marginBottom: 18,
+              }} />
 
               <TouchableOpacity
                 style={{ marginTop: 4, marginBottom: 14 }}
@@ -262,7 +278,13 @@ const renderBookmark = ({ item }) => (
                   setSettingsVisible(false);
                 }}
               >
-                <Text style={{ fontFamily: 'Quicksand', fontSize: 14, color: colors.label }}>Reload Data</Text>
+                <Text style={{
+                  fontSize: 14,
+                  color: colors.label,
+                  ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
+                }}>
+                  Reload Data
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -272,11 +294,23 @@ const renderBookmark = ({ item }) => (
                   setSettingsVisible(false);
                 }}
               >
-                <Text style={{ fontFamily: 'Quicksand', fontSize: 15, color: '#d72660' }}>Sign Out</Text>
+                <Text style={{
+                  fontSize: 15,
+                  color: '#d72660',
+                  ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
+                }}>
+                  Sign Out
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => setSettingsVisible(false)}>
-                <Text style={{ color: colors.label, fontFamily: 'Quicksand', fontSize: 15 }}>Close</Text>
+                <Text style={{
+                  color: colors.label,
+                  fontSize: 15,
+                  ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
+                }}>
+                  Close
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

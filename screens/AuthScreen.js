@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { View, TextInput, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, TextInput, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../ThemeContext';
 import { supabase } from '../supabaseClient';
@@ -49,12 +49,20 @@ export default function AuthScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View
+      style={[
+        styles.container,
+        Platform.OS === 'web' ? { maxWidth: 400, alignSelf: 'center', width: '100%' } : {},
+      ]}
+    >
       <Text style={[styles.title, { color: colors.text }]}>
         {mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
       </Text>
       <TextInput
-        style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder }]}
+        style={[
+          styles.input,
+          Platform.OS === 'web' ? { maxWidth: 380, alignSelf: 'center', width: '100%' } : {},
+        ]}
         autoCapitalize="none"
         keyboardType="email-address"
         placeholder="Email"
@@ -65,7 +73,10 @@ export default function AuthScreen() {
       {mode !== 'reset' && (
         <>
           <TextInput
-            style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder }]}
+            style={[
+              styles.input,
+              Platform.OS === 'web' ? { maxWidth: 380, alignSelf: 'center', width: '100%' } : {},
+            ]}
             secureTextEntry
             placeholder="Password"
             placeholderTextColor={colors.label}
@@ -82,7 +93,15 @@ export default function AuthScreen() {
       {err ? <Text style={{ color: '#d72660', marginBottom: 10 }}>{err}</Text> : null}
       {info ? <Text style={{ color: colors.label, marginBottom: 10 }}>{info}</Text> : null}
       <TouchableOpacity
-        style={[styles.button, { backgroundColor: colors.button }]}
+        style={[
+          styles.button,
+          {
+            borderWidth: 1.5,
+            borderColor: colors.actionButton, // border matches theme accent
+            backgroundColor: 'transparent',   // keep background clear for border
+          },
+          Platform.OS === 'web' ? { maxWidth: 380, alignSelf: 'center', width: '100%' } : {},
+        ]}
         onPress={submit}
         disabled={
           loading ||
@@ -91,7 +110,7 @@ export default function AuthScreen() {
       >
         {loading
           ? <ActivityIndicator color={colors.buttonText} />
-          : <Text style={[styles.buttonText, { color: colors.buttonText }]}>
+          : <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
               {mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Sign Up' : 'Send Reset Email'}
             </Text>}
       </TouchableOpacity>
@@ -121,8 +140,28 @@ export default function AuthScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 28 },
-  title: { fontSize: 26, fontWeight: 'bold', marginBottom: 24, fontFamily: 'Quicksand' },
-  input: { borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 14, fontFamily: 'Quicksand' },
-  button: { paddingVertical: 14, borderRadius: 16, alignItems: 'center' },
-  buttonText: { fontSize: 16, fontWeight: 'bold', fontFamily: 'Quicksand' },
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    marginBottom: 24,
+    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+    fontSize: 16,
+    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
+  },
+  button: {
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
+  },
 });

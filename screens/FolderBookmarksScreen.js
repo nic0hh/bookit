@@ -89,7 +89,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
       headerLeft: () => (
         <TouchableOpacity
           style={{ paddingHorizontal: 16 }}
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.navigate('Folders')} // 👈 always go to FoldersScreen
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -98,61 +98,51 @@ export default function FolderBookmarksScreen({ navigation, route }) {
   }, [navigation, folderName, colors.text, colors.background]);
 
   const renderBookmark = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        { 
-          backgroundColor: colors.card,
-          borderWidth: 0.7,
-          borderColor: colors.cardBorder,
-        },
-        Platform.OS === 'web' ? { width: cardWidth } : {},
-      ]}
-      onPress={() => navigation.navigate('BookmarkDetail', { bookmark: item })}
-    >
-      {item?.image ? (
-        <Image
-          source={{ uri: String(item.image) }}
-          style={[
-            styles.image,
-            Platform.OS === 'web'
-              ? {
-                  aspectRatio:
-                    item.imageWidth && item.imageHeight
-                      ? item.imageWidth / item.imageHeight
-                      : 1.5,
-                  height: item.imageWidth && item.imageHeight ? undefined : 300,
-                }
-              : { height: item.height || 200 },
-          ]}
-        />
-      ) : (
-        <View style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground }]}>
-          <Text style={{ color: colors.label }}>No image</Text>
-        </View>
-      )}
-      <Text style={[styles.title, { color: colors.text }]}>{item?.title || 'Untitled'}</Text>
-      {/* REMOVE or comment out this block to hide tags:
-      {item?.tags?.length > 0 && (
-        <View style={styles.tagsContainer}>
-          {item.tags.map((tag, idx) => (
-            <Text
-              key={idx}
-              style={[
-                styles.tag,
-                { backgroundColor: colors.tag, color: colors.tagText },
-                searchQuery.toLowerCase().includes(tag.toLowerCase())
-                  ? [styles.tagHighlighted, { backgroundColor: colors.gray, color: colors.background }]
-                  : null
-              ]}
-            >
-              {tag}
-            </Text>
-          ))}
-        </View>
-      )}
-      */}
-    </TouchableOpacity>
+    <View style={{ padding: 4, flex: 1 }}>
+      <TouchableOpacity
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.card,
+            borderWidth: 0.7,
+            borderColor: colors.cardBorder,
+          },
+        ]}
+        onPress={() => navigation.navigate('BookmarkDetail', { bookmark: item })}
+        activeOpacity={0.85}
+      >
+        {item?.image ? (
+          <Image
+            source={{ uri: String(item.image) }}
+            style={[
+              styles.image,
+              Platform.OS === 'web'
+                ? {
+                    aspectRatio:
+                      item.imageWidth && item.imageHeight
+                        ? item.imageWidth / item.imageHeight
+                        : 1.5,
+                    height: window.innerWidth < 600 ? 110 : 180,
+                  }
+                : { height: item.height || 200 },
+            ]}
+            resizeMode="cover"
+          />
+        ) : (
+          <View
+            style={[
+              styles.imagePlaceholder,
+              { backgroundColor: colors.inputBackground },
+            ]}
+          >
+            <Text style={{ color: colors.label }}>No image</Text>
+          </View>
+        )}
+        <Text style={[styles.title, { color: colors.text }]}>
+          {item?.title || 'Untitled'}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -175,16 +165,15 @@ export default function FolderBookmarksScreen({ navigation, route }) {
         data={filteredBookmarks}
         keyExtractor={(item, idx) => item.id || idx.toString()}
         renderItem={renderBookmark}
-        numColumns={Platform.OS === 'web' ? 5 : 2}
-        contentContainerStyle={styles.listContent}
+        numColumns={Platform.OS === 'web' ? (window.innerWidth < 600 ? 2 : 5) : 2}
+        contentContainerStyle={{
+          paddingHorizontal: window.innerWidth < 600 ? 6 : 12, // match HomeScreen
+          paddingTop: 10,
+          paddingBottom: 10,
+          gap: 8, // consistent gap for web
+        }}
+        style={{ flex: 1 }}
       />
-      {/* Remove or comment out this block:
-      <TouchableOpacity style={{ backgroundColor: colors.button, borderRadius: 12, padding: 12 }}>
-        <Text style={{ color: colors.buttonText, fontSize: 16, fontWeight: 'bold' }}>
-          Add Bookmark
-        </Text>
-      </TouchableOpacity>
-      */}
     </View>
   );
 }
@@ -206,12 +195,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 15,
     fontSize: 16,
-    margin: 10,
     marginTop: 10,
     marginBottom: 0,
   },
   card: {
-    margin: 8,
     borderRadius: 18,
     overflow: 'hidden',
     shadowColor: '#000',

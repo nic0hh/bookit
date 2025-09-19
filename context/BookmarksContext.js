@@ -157,32 +157,42 @@ export function BookmarksProvider({ children }) {
   async function updateBookmark(id, partial) {
     if (!user) return 'Not signed in';
     const patch = {};
+    const localPatch = {};
+
     if (partial.url) {
       const valid = validateUrl(partial.url);
       if (!valid) return 'Invalid URL';
       patch.url = valid;
+      localPatch.url = valid;
     }
-    if (partial.title !== undefined) patch.title = partial.title.slice(0, 300);
-    if (partial.image !== undefined) patch.image = partial.image || null;
-    if (partial.tags !== undefined) patch.tags = partial.tags;
-    if (partial.folderId !== undefined) patch.folder_id = partial.folderId;
+    if (partial.title !== undefined) {
+      patch.title = partial.title.slice(0, 300);
+      localPatch.title = partial.title.slice(0, 300);
+    }
+    if (partial.image !== undefined) {
+      patch.image = partial.image || null;
+      localPatch.image = partial.image || null;
+    }
+    if (partial.tags !== undefined) {
+      patch.tags = partial.tags;
+      localPatch.tags = partial.tags;
+    }
+    if (partial.folderId !== undefined) {
+      patch.folder_id = partial.folderId; // DB field
+      localPatch.folderId = partial.folderId; // local state field
+    }
 
     if (Object.keys(patch).length === 0) return 'Nothing to update';
-    const { error } = await supabase.from('bookmarks').update(patch).eq('id', id);
+
+    const { error } = await supabase
+      .from('bookmarks')
+      .update(patch)
+      .eq('id', id)
+      .eq('user_id', user.id); // add user filter for safety
+
     if (!error) {
       setBookmarks(prev =>
-        prev.map(b =>
-          b.id === id
-            ? {
-                ...b,
-                ...('url' in patch ? { url: patch.url } : {}),
-                ...('title' in patch ? { title: patch.title } : {}),
-                ...('image' in patch ? { image: patch.image } : {}),
-                ...('tags' in patch ? { tags: patch.tags } : {}),
-                ...('folder_id' in patch ? { folderId: patch.folder_id } : {}),
-              }
-            : b
-        )
+        prev.map(b => (b.id === id ? { ...b, ...localPatch } : b))
       );
       return null;
     }

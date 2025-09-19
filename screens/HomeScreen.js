@@ -93,73 +93,68 @@ export default function HomeScreen({ navigation }) {
 
   // Render each bookmark card
 const renderBookmark = ({ item }) => (
-  <TouchableOpacity
-    style={[
-      styles.card,
-      { 
-        backgroundColor: colors.card,
-        borderWidth: 0.7, // 👈 add border
-        borderColor: colors.cardBorder, // 👈 use theme border color
-      },
-      Platform.OS === 'web'
-        ? { width: cardWidth, margin: 12 } // 👈 reduce from 20 to 12 for web
-        : { margin: 8 },
-    ]}
-    onPress={() => navigation.navigate('BookmarkDetail', { bookmark: item })}
-    activeOpacity={0.85}
-  >
-    {item?.image ? (
-      <Image
-        source={{ uri: String(item.image) }}
-        style={[
-          styles.image,
-          Platform.OS === 'web'
-            ? {
-                aspectRatio:
-                  item.imageWidth && item.imageHeight
-                    ? item.imageWidth / item.imageHeight
-                    : 1.5,
-                height: item.imageWidth && item.imageHeight ? undefined : 300,
-              }
-            : { height: item.height || 200 },
-        ]}
-        resizeMode="cover"
-      />
-    ) : (
-      <View style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground }]}>
-        <Text style={{ color: colors.label }}>No image</Text>
-      </View>
-    )}
-    <Text
+  <View style={{ padding: 4, flex: 1 }}>
+    <TouchableOpacity
       style={[
-        styles.title,
-        { 
-          color: colors.text,
-          fontSize: 17,
-        }
+        styles.card,
+        { backgroundColor: colors.card, borderWidth: 0.7, borderColor: colors.cardBorder },
       ]}
+      onPress={() => navigation.navigate('BookmarkDetail', { bookmark: item })}
+      activeOpacity={0.85}
     >
-      {item?.title || 'Untitled'}
-    </Text>
-    {Platform.OS === 'web' && item?.tags?.length > 0 && (
-      <View style={styles.tagsContainer}>
-        {item.tags.map((tag, idx) => (
-          <Text
-            key={idx}
-            style={[
-              styles.tag,
-              { backgroundColor: colors.tag, color: colors.tagText },
-              searchQuery.toLowerCase().includes(tag.toLowerCase())
-                ? [styles.tagHighlighted, { backgroundColor: colors.gray, color: colors.background }]
-                : null
-            ]}
-          >
-            {tag}
-          </Text>
-        ))}
-      </View>
-    )}
-  </TouchableOpacity>
+      {item?.image ? (
+        <Image
+          source={{ uri: String(item.image) }}
+          style={[
+            styles.image,
+            Platform.OS === 'web'
+              ? {
+                  aspectRatio:
+                    item.imageWidth && item.imageHeight
+                      ? item.imageWidth / item.imageHeight
+                      : 1.5,
+                  height: window.innerWidth < 600 ? 110 : 180, // 👈 shorter image for phone browser
+                }
+              : { height: item.height || 160 },
+          ]}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground }]}>
+          <Text style={{ color: colors.label }}>No image</Text>
+        </View>
+      )}
+      <Text
+        style={[
+          styles.title,
+          { 
+            color: colors.text,
+            fontSize: 17,
+          }
+        ]}
+      >
+        {item?.title || 'Untitled'}
+      </Text>
+      {Platform.OS === 'web' && item?.tags?.length > 0 && (
+        <View style={styles.tagsContainer}>
+          {item.tags.map((tag, idx) => (
+            <Text
+              key={idx}
+              style={[
+                styles.tag,
+                { backgroundColor: colors.tag, color: colors.tagText },
+                searchQuery.toLowerCase().includes(tag.toLowerCase())
+                  ? [styles.tagHighlighted, { backgroundColor: colors.gray, color: colors.background }]
+                  : null
+              ]}
+            >
+              {tag}
+            </Text>
+          ))}
+        </View>
+      )}
+    </TouchableOpacity>
+  </View>
 );
 
 
@@ -174,6 +169,7 @@ const renderBookmark = ({ item }) => (
               backgroundColor: colors.inputBackground,
               color: colors.text,
               borderColor: colors.inputBorder,
+              flex: 1, // fill available space
             },
           ]}
           placeholder="Search bookmarks or tags"
@@ -181,24 +177,33 @@ const renderBookmark = ({ item }) => (
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
-        <TouchableOpacity onPress={() => setSettingsVisible(true)} style={{ marginLeft: 8 }}>
-          <Ionicons name="settings-outline" size={24} color={colors.settingsIcon} />
+        <TouchableOpacity
+          style={{
+            marginLeft: 10,
+            padding: 8,
+            alignSelf: 'center',
+          }}
+          onPress={() => setSettingsVisible(true)}
+        >
+          <Ionicons name="settings-outline" size={28} color={colors.settingsIcon} />
         </TouchableOpacity>
       </View>
 
-      {/* Masonry grid */}
+      {/* Responsive columns for MasonryList */}
       <MasonryList
         data={filteredBookmarks}
         keyExtractor={(item, idx) => item.id || idx.toString()}
         renderItem={renderBookmark}
-        numColumns={Platform.OS === 'web' ? 5 : 2}
+        numColumns={Platform.OS === 'web' ? (window.innerWidth < 600 ? 2 : 5) : 2}
         contentContainerStyle={{
-          padding: 10,
-          paddingBottom: 0, // 👈 ensure no extra bottom padding
+          paddingHorizontal: window.innerWidth < 600 ? 6 : 12,
+          paddingTop: 10,
+          paddingBottom: 10,
+          gap: 8, // works for web
         }}
         ListEmptyComponent={
           !loadingRemote ? (
-            <Text style={{ color: colors.label, textAlign: 'center', marginTop: 40, fontFamily: 'Quicksand' }}>
+            <Text style={{ color: colors.label, textAlign: 'center', marginTop: 40, fontFamily: 'sans-serif' }}>
               No bookmarks yet
             </Text>
           ) : null
@@ -334,17 +339,15 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   searchInput: {
-    flex: 1,
     height: 40,
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 15,
     fontSize: 16,
-    marginBottom: 0,
-    // No fontFamily
+    // flex: 1 is set inline above
   },
   card: {
-    margin: 8,
+    margin: 8, // Ensure margin around each card
     borderRadius: 18,
     overflow: 'hidden',
     shadowColor: '#000',

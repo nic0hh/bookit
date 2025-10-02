@@ -246,7 +246,7 @@ export function BookmarksProvider({ children }) {
 
     if (Object.keys(patch).length === 0) return 'Nothing to update';
 
-    setLastEditId(id); // 👈 Mark as locally edited
+    const updated = { id, ...localPatch };
 
     const { error } = await supabase
       .from('bookmarks')
@@ -256,12 +256,22 @@ export function BookmarksProvider({ children }) {
 
     if (!error) {
       setBookmarks(prev =>
-        prev.map(b => (b.id === id ? { ...b, ...localPatch } : b))
+        prev.map(b => (b.id === id ? { ...b, ...updated } : b))
       );
       setShuffledBookmarks(prev =>
-        prev.map(b => (b.id === id ? { ...b, ...localPatch } : b))
+        prev.map(b => (b.id === id ? { ...b, ...updated } : b))
       );
-      setTimeout(() => setLastEditId(null), 2000); // 👈 Reset after delay
+
+      setLastEditId(id); // Protect this bookmark from being overwritten
+
+      // Clear protection when Supabase confirms the update
+      supabase
+        .from('bookmarks')
+        .select('id')
+        .eq('id', id)
+        .single()
+        .then(() => setLastEditId(null));
+
       return null;
     }
     return error?.message || 'Failed to update bookmark';
@@ -347,7 +357,11 @@ export function BookmarksProvider({ children }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookmarks', filter: `user_id=eq.${user.id}` },
-        () => loadBookmarks()
+        (payload) => {
+          // Ignore Supabase events for the bookmark we just updated
+          if (payload.new?.id === lastEditId) return;
+          loadBookmarks();
+        }
       )
       .subscribe();
 
@@ -364,7 +378,7 @@ export function BookmarksProvider({ children }) {
       supabase.removeChannel(bookmarksChannel);
       supabase.removeChannel(foldersChannel);
     };
-  }, [user, loadBookmarks, loadFolders]);
+  }, [user, loadBookmarks, loadFolders, lastEditId]);
 
   const value = {
     bookmarks,

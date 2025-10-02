@@ -6,13 +6,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const BookmarksContext = createContext();
 
+function shuffleArray(arr) {
+  return [...arr].sort(() => Math.random() - 0.5);
+}
+
 export function BookmarksProvider({ children }) {
   const { user } = useContext(AuthContext);
 
-  const [bookmarks, setBookmarks] = useState([]);
+  const [bookmarks, setBookmarks] = useState([]); // raw bookmarks
+  const [shuffledBookmarks, setShuffledBookmarks] = useState([]); // shuffled bookmarks
   const [folders, setFolders] = useState([]);
   const [loadingRemote, setLoadingRemote] = useState(false);
   const [migrating, setMigrating] = useState(false);
+  const [lastEditId, setLastEditId] = useState(null); // 👈 track recent edits
 
   // ---- Remote loaders ----
   const loadFolders = useCallback(async () => {
@@ -20,9 +26,13 @@ export function BookmarksProvider({ children }) {
     const { data, error } = await supabase
       .from('folders')
       .select('*')
-      .order('created_at', { ascending: true });
+      .order('position', { ascending: true }); // <-- sort by position
     if (!error && data) {
-      setFolders(data.map(f => ({ id: f.id, name: f.name })));
+      setFolders(data.map(f => ({
+        id: f.id,
+        name: f.name,
+        position: f.position, // <-- include position
+      })));
     }
   }, [user]);
 
@@ -32,24 +42,39 @@ export function BookmarksProvider({ children }) {
       .from('bookmarks')
       .select('*')
       .order('created_at', { ascending: false });
+
     if (!error && data) {
-      setBookmarks(
-        data.map(b => ({
-          id: b.id,
-            url: b.url,
-            title: b.title,
-            image: b.image,
-            tags: b.tags || [],
-            folderId: b.folder_id || null,
-        }))
-      );
+      const formatted = data.map(b => ({
+        id: b.id,
+        url: b.url,
+        title: b.title,
+        image: b.image,
+        tags: b.tags || [],
+        folderId: b.folder_id || null,
+      }));
+
+      setBookmarks(formatted);
+
+      setShuffledBookmarks(prev => {
+        if (!prev.length) return shuffleArray(formatted); // Only shuffle on first load or manual refresh
+
+        return prev.map(shuf => {
+          if (shuf.id === lastEditId) {
+            // 👈 Protect local edit from being overwritten
+            return shuf;
+          }
+          const fresh = formatted.find(b => b.id === shuf.id);
+          return fresh ? { ...shuf, ...fresh } : shuf;
+        });
+      });
     }
-  }, [user]);
+  }, [user, lastEditId]);
 
   // Initial + user change
   useEffect(() => {
     if (!user) {
       setBookmarks([]);
+      setShuffledBookmarks([]);
       setFolders([]);
       return;
     }
@@ -72,18 +97,22 @@ export function BookmarksProvider({ children }) {
     }
   }
 
-  // ---- Folder CRUD (remote) ----
+  // ---- Folder CRUD ----
   async function addFolder(name) {
     if (!user) return 'Not signed in';
     const clean = name.trim().slice(0, 120);
     if (!clean) return 'Folder name required';
+    // Find the next position value
+    const nextPosition = folders.length > 0
+      ? Math.max(...folders.map(f => f.position ?? 0)) + 1
+      : 0;
     const { data, error } = await supabase
       .from('folders')
-      .insert({ name: clean, user_id: user.id }) // <-- add user_id
+      .insert({ name: clean, user_id: user.id, position: nextPosition }) // <-- position is set here
       .select()
       .single();
     if (!error && data) {
-      setFolders(prev => [...prev, { id: data.id, name: data.name }]);
+      setFolders(prev => [...prev, { id: data.id, name: data.name, position: data.position }]);
       return null;
     }
     return error?.message || 'Failed to add folder';
@@ -98,7 +127,7 @@ export function BookmarksProvider({ children }) {
       .from('folders')
       .update({ name: clean })
       .eq('id', id)
-      .eq('user_id', user.id); // 👈 add user_id for RLS
+      .eq('user_id', user.id);
 
     if (error) return error.message || 'Failed to update folder';
 
@@ -106,7 +135,7 @@ export function BookmarksProvider({ children }) {
       prev.map(f => (f.id === id ? { ...f, name: clean } : f))
     );
 
-    return null; // success
+    return null;
   }
 
   async function removeFolder(id) {
@@ -120,7 +149,41 @@ export function BookmarksProvider({ children }) {
     return error?.message || 'Failed to delete folder';
   }
 
-  // ---- Bookmark CRUD (remote) ----
+  async function moveFolder(id, direction) {
+    if (!user) return 'Not signed in';
+    // Find current folder and its position
+    const folder = folders.find(f => f.id === id);
+    if (!folder) return 'Folder not found';
+
+    // Sort folders by position
+    const sorted = [...folders].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const idx = sorted.findIndex(f => f.id === id);
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= sorted.length) return 'Cannot move';
+
+    const targetFolder = sorted[targetIdx];
+
+    // Swap positions in Supabase
+    const { error: err1 } = await supabase
+      .from('folders')
+      .update({ position: targetFolder.position })
+      .eq('id', folder.id)
+      .eq('user_id', user.id);
+
+    const { error: err2 } = await supabase
+      .from('folders')
+      .update({ position: folder.position })
+      .eq('id', targetFolder.id)
+      .eq('user_id', user.id);
+
+    if (err1 || err2) return err1?.message || err2?.message || 'Failed to move folder';
+
+    // Reload folders to update UI
+    await loadFolders();
+    return null;
+  }
+
+  // ---- Bookmark CRUD ----
   async function addBookmark({ url, title, image, tags = [], folderId = null }) {
     if (!user) return 'Not signed in';
     const valid = validateUrl(url);
@@ -133,22 +196,21 @@ export function BookmarksProvider({ children }) {
         image: image || null,
         tags,
         folder_id: folderId || null,
-        user_id: user.id // <-- add user_id
+        user_id: user.id
       })
       .select()
       .single();
     if (!error && data) {
-      setBookmarks(prev => [
-        {
-          id: data.id,
-          url: data.url,
-          title: data.title,
-          image: data.image,
-          tags: data.tags || [],
-          folderId: data.folder_id,
-        },
-        ...prev,
-      ]);
+      const newBookmark = {
+        id: data.id,
+        url: data.url,
+        title: data.title,
+        image: data.image,
+        tags: data.tags || [],
+        folderId: data.folder_id,
+      };
+      setBookmarks(prev => [newBookmark, ...prev]);
+      setShuffledBookmarks(prev => [newBookmark, ...prev]);
       return null;
     }
     return error?.message || 'Failed to add bookmark';
@@ -178,22 +240,28 @@ export function BookmarksProvider({ children }) {
       localPatch.tags = partial.tags;
     }
     if (partial.folderId !== undefined) {
-      patch.folder_id = partial.folderId; // DB field
-      localPatch.folderId = partial.folderId; // local state field
+      patch.folder_id = partial.folderId;
+      localPatch.folderId = partial.folderId;
     }
 
     if (Object.keys(patch).length === 0) return 'Nothing to update';
+
+    setLastEditId(id); // 👈 Mark as locally edited
 
     const { error } = await supabase
       .from('bookmarks')
       .update(patch)
       .eq('id', id)
-      .eq('user_id', user.id); // add user filter for safety
+      .eq('user_id', user.id);
 
     if (!error) {
       setBookmarks(prev =>
         prev.map(b => (b.id === id ? { ...b, ...localPatch } : b))
       );
+      setShuffledBookmarks(prev =>
+        prev.map(b => (b.id === id ? { ...b, ...localPatch } : b))
+      );
+      setTimeout(() => setLastEditId(null), 2000); // 👈 Reset after delay
       return null;
     }
     return error?.message || 'Failed to update bookmark';
@@ -204,6 +272,7 @@ export function BookmarksProvider({ children }) {
     const { error } = await supabase.from('bookmarks').delete().eq('id', id);
     if (!error) {
       setBookmarks(prev => prev.filter(b => b.id !== id));
+      setShuffledBookmarks(prev => prev.filter(b => b.id !== id));
       return null;
     }
     return error?.message || 'Failed to delete bookmark';
@@ -273,29 +342,21 @@ export function BookmarksProvider({ children }) {
   useEffect(() => {
     if (!user) return;
 
-    // Subscribe to bookmarks changes
     const bookmarksChannel = supabase
       .channel('public:bookmarks')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookmarks', filter: `user_id=eq.${user.id}` },
-        payload => {
-          // Refetch bookmarks on any change
-          loadBookmarks();
-        }
+        () => loadBookmarks()
       )
       .subscribe();
 
-    // Subscribe to folders changes
     const foldersChannel = supabase
       .channel('public:folders')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'folders', filter: `user_id=eq.${user.id}` },
-        payload => {
-          // Refetch folders on any change
-          loadFolders();
-        }
+        () => loadFolders()
       )
       .subscribe();
 
@@ -303,17 +364,18 @@ export function BookmarksProvider({ children }) {
       supabase.removeChannel(bookmarksChannel);
       supabase.removeChannel(foldersChannel);
     };
-    // eslint-disable-next-line
-  }, [user]);
+  }, [user, loadBookmarks, loadFolders]);
 
   const value = {
     bookmarks,
+    shuffledBookmarks,
     folders,
     loadingRemote,
     migrating,
     addFolder,
     editFolder,
     removeFolder,
+    moveFolder,        // 👈 add this line
     addBookmark,
     updateBookmark,
     deleteBookmark,

@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, A
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { ThemeContext } from '../ThemeContext';
-import { Ionicons } from '@expo/vector-icons'; // Make sure this is imported
+import { Ionicons } from '@expo/vector-icons';
 
 export default function FoldersScreen({ navigation }) {
   const { colors } = useContext(ThemeContext);
@@ -13,14 +13,17 @@ export default function FoldersScreen({ navigation }) {
     removeFolder,
     loadingRemote,
     editFolder,
+    moveFolder,
   } = useContext(BookmarksContext);
-
-  const { setThemeName } = useContext(ThemeContext);
 
   const [newFolder, setNewFolder] = useState('');
   const [editingFolder, setEditingFolder] = useState(null);
   const [editName, setEditName] = useState('');
   const [editModalVisible, setEditModalVisible] = useState(false);
+
+  // Sort folders by position for display and modal logic
+  const sortedFolders = [...folders].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const currentIdx = editingFolder ? sortedFolders.findIndex(f => f.id === editingFolder.id) : -1;
 
   const createFolder = async () => {
     if (!newFolder.trim()) return;
@@ -78,7 +81,7 @@ export default function FoldersScreen({ navigation }) {
       )}
 
       <FlatList
-        data={folders}
+        data={sortedFolders}
         keyExtractor={item => item.id}
         contentContainerStyle={{
           paddingHorizontal: 16,
@@ -104,7 +107,7 @@ export default function FoldersScreen({ navigation }) {
                     maxWidth: 340,
                     alignSelf: 'center',
                     width: '100%',
-                    position: 'relative', // for icon positioning
+                    position: 'relative',
                   }
                 : {
                     maxWidth: 280,
@@ -125,7 +128,7 @@ export default function FoldersScreen({ navigation }) {
               {item.name}
             </Text>
 
-            {/* Web: 3-dot menu for edit/delete */}
+            {/* Web: 3-dot menu for edit/delete/move */}
             {Platform.OS === 'web' && (
               <TouchableOpacity
                 style={{
@@ -253,6 +256,7 @@ export default function FoldersScreen({ navigation }) {
         </View>
       </KeyboardAvoidingView>
 
+      {/* Edit/Delete/Move Modal */}
       {editModalVisible && (
         <View
           style={{
@@ -297,39 +301,110 @@ export default function FoldersScreen({ navigation }) {
               placeholder="Folder name"
               placeholderTextColor={colors.label}
             />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+
+            <View style={{ alignItems: 'stretch', marginBottom: 12 }}>
               <TouchableOpacity
                 onPress={() => setEditModalVisible(false)}
-                style={{ marginRight: 12 }}
+                style={{
+                  borderRadius: 15,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginBottom: 10,
+                  borderWidth: 0.7,
+                  backgroundColor: colors.inputBackground,
+                  borderColor: colors.inputBorder,
+                }}
               >
-                <Text style={{ color: colors.label, fontSize: 15 }}>
+                <Text style={{ color: colors.label, fontSize: 16, fontWeight: 'bold' }}>
                   Cancel
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSave}
-                style={{ backgroundColor: colors.button, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8 }}
+                style={{
+                  borderRadius: 15,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginBottom: 10,
+                  borderWidth: 0.7,
+                  backgroundColor: colors.actionButton,
+                  borderColor: colors.actionButtonText,
+                  opacity: editName.trim() ? 1 : 0.5,
+                }}
                 disabled={!editName.trim()}
               >
-                <Text style={{ color: colors.buttonText, fontSize: 15, fontWeight: 'bold' }}>
+                <Text style={{ color: colors.actionButtonText, fontSize: 16, fontWeight: 'bold' }}>
                   Save
                 </Text>
               </TouchableOpacity>
-              {/* Add Delete button for web */}
-              {Platform.OS === 'web' && (
+            </View>
+
+            {/* Move Up/Down/Delete buttons (web only) */}
+            {Platform.OS === 'web' && (
+              <>
+                <TouchableOpacity
+                  onPress={async () => {
+                    await moveFolder(editingFolder.id, 'up');
+                    setEditModalVisible(false);
+                  }}
+                  style={{
+                    borderRadius: 15,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    marginBottom: 10,
+                    borderWidth: 0.7,
+                    backgroundColor: colors.actionButton,
+                    borderColor: colors.actionButtonText,
+                    opacity: currentIdx === 0 ? 0.5 : 1,
+                  }}
+                  disabled={currentIdx === 0}
+                >
+                  <Text style={{ color: colors.actionButtonText, fontSize: 16, fontWeight: 'bold' }}>
+                    Move Up
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={async () => {
+                    await moveFolder(editingFolder.id, 'down');
+                    setEditModalVisible(false);
+                  }}
+                  style={{
+                    borderRadius: 15,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    marginBottom: 10,
+                    borderWidth: 0.7,
+                    backgroundColor: colors.actionButton,
+                    borderColor: colors.actionButtonText,
+                    opacity: currentIdx === sortedFolders.length - 1 ? 0.5 : 1,
+                  }}
+                  disabled={currentIdx === sortedFolders.length - 1}
+                >
+                  <Text style={{ color: colors.actionButtonText, fontSize: 16, fontWeight: 'bold' }}>
+                    Move Down
+                  </Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={async () => {
                     await removeFolder(editingFolder.id);
                     setEditModalVisible(false);
                   }}
-                  style={{ backgroundColor: '#d72660', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 }}
+                  style={{
+                    borderRadius: 15,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    marginBottom: 10,
+                    borderWidth: 0.7,
+                    backgroundColor: '#ff1f1fff',
+                    borderColor: '#fd0c0cff',
+                  }}
                 >
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: 'bold' }}>
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
                     Delete
                   </Text>
                 </TouchableOpacity>
-              )}
-            </View>
+              </>
+            )}
           </View>
         </View>
       )}

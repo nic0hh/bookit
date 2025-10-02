@@ -3,7 +3,8 @@ import React, { useState, useContext, useLayoutEffect } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, Image, StyleSheet, ScrollView,
-  TouchableOpacity, Modal, FlatList, Alert, Platform, KeyboardAvoidingView
+  TouchableOpacity, Modal, FlatList, Alert, Platform, KeyboardAvoidingView,
+  Linking
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
@@ -104,6 +105,14 @@ export default function BookmarkDetailScreen({ route, navigation }) {
     if (url) {
       Clipboard.setStringAsync(url);
       Alert.alert('Copied', 'URL copied to clipboard!');
+    }
+  };
+
+  const openUrl = () => {
+    if (url) {
+      Linking.openURL(url);
+    } else {
+      Alert.alert('No URL', 'This bookmark does not have a valid URL.');
     }
   };
 
@@ -338,7 +347,7 @@ export default function BookmarkDetailScreen({ route, navigation }) {
               {
                 backgroundColor: colors.actionButton,
                 borderWidth: 0.7,
-                borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
+                borderColor: colors.actionButtonText,
                 marginTop: 12,
                 marginBottom: 8,
               }
@@ -351,10 +360,28 @@ export default function BookmarkDetailScreen({ route, navigation }) {
             </Text>
           </TouchableOpacity>
 
+          {/* Go to Site button */}
           <TouchableOpacity
             style={[
               styles.buttonGray,
-              { backgroundColor: '#f31919ff', marginTop: 5 } // 👈 remove extra space above delete button
+              {
+                backgroundColor: colors.actionButton,         // match Save Changes button
+                borderWidth: 0.7,
+                borderColor: colors.actionButtonText,         // match Save Changes button
+                marginBottom: 8,
+              }
+            ]}
+            onPress={openUrl}
+          >
+            <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
+              Go to Site
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.buttonGray,
+              { backgroundColor: '#f31919ff', marginTop: 5 }
             ]}
             onPress={confirmDelete}
             disabled={removing}

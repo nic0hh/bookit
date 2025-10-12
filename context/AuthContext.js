@@ -1,18 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-export const supabase = createClient(
-  supabaseUrl,
-  supabaseAnonKey,
-  {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: false,
-  }
-);
+import { supabase } from '../supabaseClient';
 
 export const AuthContext = createContext();
 
@@ -21,35 +8,53 @@ export function AuthProvider({ children }) {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      setUser(data?.session?.user || null);
-      setInitializing(false);
-    };
-    getSession();
+    let sub;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const sessionUser = data?.session?.user ?? null;
+        if (sessionUser) setUser(sessionUser);
+      } catch (e) {
+        console.log('AuthContext rehydrate error', e);
+      }
 
-    // Optionally, listen for auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-    });
+      // subscribe to changes so AuthContext and supabase client stay in sync
+      try {
+        const resp = supabase.auth.onAuthStateChange((_event, session) => {
+          setUser(session?.user ?? null);
+          setInitializing(false); // ensure we stop initializing when auth state arrives
+        });
+        sub = resp?.data?.subscription;
+      } catch (e) {
+        console.log('AuthContext subscribe error', e);
+        setInitializing(false);
+      }
+
+      // If no event fires, make sure we stop initializing
+      setInitializing(false);
+    })();
 
     return () => {
-      listener?.subscription?.unsubscribe();
+      if (sub?.unsubscribe) sub.unsubscribe();
     };
   }, []);
 
   const signIn = useCallback(async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return error;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data?.session?.user) {
+      setUser(data.session.user);
+    }
+    return { data, error };
   }, []);
 
   const signUp = useCallback(async (email, password) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return error;
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    return { data, error };
   }, []);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    setUser(null);
   }, []);
 
   const isVerified = user?.email_confirmed_at || user?.confirmed_at;

@@ -19,16 +19,22 @@ function shuffleArray(array) {
 }
 
 export default function HomeScreen({ navigation }) {
-  const { bookmarks, reloadAll, loadingRemote } = useContext(BookmarksContext);
   const { signOut, user } = useContext(AuthContext);
   const { theme, colors, setThemeName } = useContext(ThemeContext);
+  const ctx = useContext(BookmarksContext) || {};
+  const bookmarks = ctx.bookmarks || [];
+  const shuffledBookmarks = ctx.shuffledBookmarks || [];
+  const folders = ctx.folders || [];
+  const loadingRemote = ctx.loadingRemote || false;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [shuffledBookmarks, setShuffledBookmarks] = useState([]);
-  const [filteredBookmarks, setFilteredBookmarks] = useState([]);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [cardWidth, setCardWidth] = useState(200);
   const debounceTimeout = useRef(null);
+
+  // Local UI state (missing -> caused ReferenceError)
+  const [shuffledLocal, setShuffledBookmarks] = useState(shuffledBookmarks);
+  const [filteredBookmarks, setFilteredBookmarks] = useState(shuffledBookmarks);
 
   // Add this ref for web session shuffle
   const shuffledRef = useRef(null);
@@ -90,6 +96,14 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const CARD_IMAGE_HEIGHT = 280; // consistent fallback
+
+  // when deriving visible bookmarks:
+  const visible = (filteredBookmarks || []).filter(b => {
+    if (!b.folderId) return true;
+    const f = folders.find(x => x.id === b.folderId);
+    return !f?.hidden;
+  });
+  // use `visible` for rendering instead of shuffledBookmarks
 
   // Render each bookmark card
 const renderBookmark = ({ item }) => (
@@ -191,7 +205,7 @@ const renderBookmark = ({ item }) => (
 
       {/* Responsive columns for MasonryList */}
       <MasonryList
-        data={filteredBookmarks}
+        data={visible}
         keyExtractor={(item, idx) => item.id || idx.toString()}
         renderItem={renderBookmark}
         numColumns={Platform.OS === 'web' ? (window.innerWidth < 600 ? 2 : 5) : 2}

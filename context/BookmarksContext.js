@@ -2,7 +2,11 @@
 import { supabase } from '../supabaseClient';
 import { AuthContext } from './AuthContext';
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// storage bucket name (adjust if different)
+const STORAGE_BUCKET = 'bookmark-images';
 
 export const BookmarksContext = createContext();
 
@@ -20,47 +24,121 @@ export function BookmarksProvider({ children }) {
   const [migrating, setMigrating] = useState(false);
   const [lastEditId, setLastEditId] = useState(null); // 👈 track recent edits
 
+  // Prevent reshuffle when applying realtime sync updates
+  const suppressShuffleRef = React.useRef(false);
+
   // ---- Remote loaders ----
   const loadFolders = useCallback(async () => {
     if (!user) return;
     const { data, error } = await supabase
       .from('folders')
       .select('*')
-      .order('position', { ascending: true }); // <-- sort by position
-    if (!error && data) {
+      .eq('user_id', user.id)                // <-- ensure we fetch only this user's folders
+      .order('position', { ascending: true });
+    if (error) {
+      console.log('loadFolders error', error);
+      return;
+    }
+    if (data) {
       setFolders(data.map(f => ({
         id: f.id,
         name: f.name,
-        position: f.position, // <-- include position
+        position: f.position,
+        hidden: !!f.hidden_on_home,
       })));
     }
   }, [user]);
 
   const loadBookmarks = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('loadBookmarks: no user');
+      return;
+    }
+
+    console.log('DEBUG loadBookmarks: user object =', user);
+
+    // Debug supabase auth state (v2)
+    try {
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      console.log('DEBUG supabase.auth.getSession =>', sessionData, sessionErr);
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      console.log('DEBUG supabase.auth.getUser =>', userData, userErr);
+    } catch(e) {
+      console.log('DEBUG auth check error', e);
+    }
+    console.log('AuthContext user.id =', user.id);
+
+    // Debug: fetch a few rows without a user filter to see if the table has data reachable from device
+    try {
+      const { data: allRows, error: allErr } = await supabase.from('bookmarks').select('*').limit(5);
+      console.log('DEBUG all bookmarks (no filter) => err:', allErr, 'rows:', allRows?.length, allRows?.slice(0,3));
+    } catch (e) {
+      console.log('DEBUG fetch all bookmarks error', e);
+    }
+
+    console.log('loadBookmarks: fetching for user', user.id);
     const { data, error } = await supabase
       .from('bookmarks')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      const formatted = data.map(b => ({
-        id: b.id,
-        url: b.url,
-        title: b.title,
-        image: b.image,
-        tags: b.tags || [],
-        folderId: b.folder_id || null,
+    if (error) {
+      console.log('loadBookmarks error', error);
+      return;
+    }
+
+    if (data) {
+      console.log('loadBookmarks: got rows=', data.length);
+      const formatted = data.map(row => ({
+        id: row.id,
+        url: row.url,
+        title: row.title,
+        image: row.image,
+        imagePath: row.image_path || null,
+        tags: row.tags || [],
+        folderId: row.folder_id || null,
       }));
 
-      setBookmarks(formatted);
+      // Filter out any leftover blob/blon images from old saves
+      formatted.forEach(b => {
+        if (b.image && (/^(blob:|blon:)/i).test(String(b.image))) {
+          console.log('Removing invalid blob image', b.image);
+          b.image = null;
+        }
+      });
+
+      // Refresh signed URLs for private bucket objects (non-blocking but awaited here)
+      await Promise.all(formatted.map(async (b) => {
+        if (b.imagePath) {
+          try {
+            const { data: urlData, error: urlErr } = await supabase
+              .storage
+              .from(STORAGE_BUCKET)
+              .createSignedUrl(b.imagePath, 60 * 60); // 1 hour
+            if (!urlErr && urlData?.signedUrl) {
+              b.image = urlData.signedUrl;
+            } else if (urlErr) {
+              console.warn('createSignedUrl error', urlErr);
+            }
+          } catch (e) {
+            console.warn('signed url refresh failed', e);
+          }
+        }
+      }));
+
+    setBookmarks(formatted);
 
       setShuffledBookmarks(prev => {
-        if (!prev.length) return shuffleArray(formatted); // Only shuffle on first load or manual refresh
+        // If it's the first load OR we are NOT in a realtime sync, reshuffle.
+        if (!prev.length || !suppressShuffleRef.current) {
+          return shuffleArray(formatted);
+        }
 
+        // Otherwise (realtime sync) merge into existing shuffled order without reshuffling.
         return prev.map(shuf => {
           if (shuf.id === lastEditId) {
-            // 👈 Protect local edit from being overwritten
+            // Protect local edit from being overwritten
             return shuf;
           }
           const fresh = formatted.find(b => b.id === shuf.id);
@@ -72,6 +150,7 @@ export function BookmarksProvider({ children }) {
 
   // Initial + user change
   useEffect(() => {
+    console.log('BookmarksProvider mounted/updated, user=', user ? user.id : null);
     if (!user) {
       setBookmarks([]);
       setShuffledBookmarks([]);
@@ -183,23 +262,86 @@ export function BookmarksProvider({ children }) {
     return null;
   }
 
+  // Toggle whether a folder (and its bookmarks) are shown on the Home page
+  async function setFolderHidden(folderId, hidden) {
+    if (!user) return 'Not signed in';
+    try {
+      const { error } = await supabase
+        .from('folders')
+        .update({ hidden_on_home: hidden })
+        .eq('id', folderId)
+        .eq('user_id', user.id);
+
+      if (error) return error.message || 'Failed to update folder';
+
+      // update local folders state immediately
+      setFolders(prev => prev.map(f => (f.id === folderId ? { ...f, hidden } : f)));
+
+      // refresh bookmarks to immediately reflect hidden folders on Home
+      try {
+        await loadBookmarks();
+      } catch (e) {
+        console.warn('reload after setFolderHidden failed', e);
+      }
+
+      return null;
+    } catch (e) {
+      console.warn('setFolderHidden error', e);
+      return 'Failed to update folder';
+    }
+  }
+
   // ---- Bookmark CRUD ----
   async function addBookmark({ url, title, image, tags = [], folderId = null }) {
     if (!user) return 'Not signed in';
     const valid = validateUrl(url);
     if (!valid) return 'Invalid URL';
+    // If image is a blob: URL (web upload), upload it to storage first
+    let imageUrlToStore = image || null;
+    let imagePathToStore = null;
+    if (image && typeof image === 'string' && image.startsWith('blob:')) {
+      try {
+        const res = await fetch(image);
+        const blob = await res.blob();
+        const fileName = `${Date.now()}.jpg`;
+        const filePath = `${user.id}/${Date.now()}-${fileName}`;
+
+        const { data: uploadData, error: uploadErr } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(filePath, blob, { upsert: true, contentType: 'image/jpeg' });
+
+        console.log('addBookmark: upload result', { uploadData, uploadErr, filePath });
+
+        if (uploadErr) {
+          console.error('Image upload failed:', uploadErr);
+        } else {
+          // create signed URL for immediate use
+          const { data: urlData, error: urlErr } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .createSignedUrl(filePath, 60 * 60);
+          console.log('addBookmark: createSignedUrl', { urlData, urlErr });
+          if (!urlErr && urlData?.signedUrl) imageUrlToStore = urlData.signedUrl;
+          imagePathToStore = filePath;
+        }
+      } catch (e) {
+        console.error('Blob conversion/upload failed:', e);
+      }
+    }
+
     const { data, error } = await supabase
       .from('bookmarks')
       .insert({
         url: valid,
         title: (title || '').slice(0, 300),
-        image: image || null,
+        image: imageUrlToStore,
+        image_path: imagePathToStore,
         tags,
         folder_id: folderId || null,
         user_id: user.id
       })
-      .select()
-      .single();
+       .select()
+       .single();
+    console.log('addBookmark: insert result', { data, error });
     if (!error && data) {
       const newBookmark = {
         id: data.id,
@@ -232,8 +374,39 @@ export function BookmarksProvider({ children }) {
       localPatch.title = partial.title.slice(0, 300);
     }
     if (partial.image !== undefined) {
-      patch.image = partial.image || null;
-      localPatch.image = partial.image || null;
+      let imageUrl = partial.image || null;
+
+      // If a blob: URL was provided (web preview), upload it to Supabase Storage.
+      // Change STORAGE_BUCKET to 'bookmark-images' if your bucket name differs.
+      const STORAGE_BUCKET = 'bookmark-images';
+      if (imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('blob:')) {
+        try {
+          const res = await fetch(imageUrl);
+          const blob = await res.blob();
+          const fileName = `bookmark_${id}_${Date.now()}.jpg`;
+
+          const { data: uploadData, error: uploadErr } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(fileName, blob, { upsert: true, contentType: 'image/jpeg' });
+          console.log('updateBookmark: upload result', { uploadData, uploadErr, filePath });
+          if (uploadErr) {
+            console.error('Image upload failed:', uploadErr);
+          } else {
+            // create a signed URL to use immediately
+            const { data: urlData, error: urlErr } = await supabase.storage
+              .from(STORAGE_BUCKET)
+              .createSignedUrl(filePath, 60 * 60);
+            console.log('updateBookmark: createSignedUrl', { urlData, urlErr });
+            if (!urlErr && urlData?.signedUrl) imageUrl = urlData.signedUrl;
+            imagePath = filePath;
+          }
+        } catch (e) {
+          console.error('Blob conversion/upload failed:', e);
+        }
+      }
+
+      patch.image = imageUrl;
+      localPatch.image = imageUrl;
     }
     if (partial.tags !== undefined) {
       patch.tags = partial.tags;
@@ -255,12 +428,13 @@ export function BookmarksProvider({ children }) {
       .eq('user_id', user.id);
 
     if (!error) {
-      setBookmarks(prev =>
-        prev.map(b => (b.id === id ? { ...b, ...updated } : b))
-      );
-      setShuffledBookmarks(prev =>
-        prev.map(b => (b.id === id ? { ...b, ...updated } : b))
-      );
+      // Apply only the localPatch to avoid overwriting server fields and
+      // force a new array reference for shuffledBookmarks so lists re-render.
+      setBookmarks(prev => prev.map(b => (b.id === id ? { ...b, ...localPatch } : b)));
+      setShuffledBookmarks(prev => {
+        const updatedList = prev.map(b => (b.id === id ? { ...b, ...localPatch } : b));
+        return [...updatedList];
+      });
 
       setLastEditId(id); // Protect this bookmark from being overwritten
 
@@ -278,14 +452,54 @@ export function BookmarksProvider({ children }) {
   }
 
   async function deleteBookmark(id) {
-    if (!user) return 'Not signed in';
-    const { error } = await supabase.from('bookmarks').delete().eq('id', id);
-    if (!error) {
+    console.log('🗑 deleteBookmark CALLED with id:', id);
+    if (!user) {
+      console.log('deleteBookmark: no user');
+      return 'Not signed in';
+    }
+
+    try {
+      // Attempt delete scoped to current user (RLS-safe)
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('deleteBookmark error', error);
+        // show on-screen for quick debugging (remove in production)
+        try { Alert.alert('Delete failed', JSON.stringify(error)); } catch {}
+        return error?.message || 'Failed to delete bookmark';
+      }
+
+      // If DB returned the deleted row with image_path, try to remove storage object
+      const imagePath = data?.image_path || null;
+      if (imagePath) {
+        try {
+          const { error: removeErr } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .remove([imagePath]);
+          if (removeErr) {
+            console.warn('deleteBookmark: failed to remove storage object', removeErr);
+          }
+        } catch (e) {
+          console.warn('deleteBookmark: storage removal exception', e);
+        }
+      }
+
+      // Update local state
       setBookmarks(prev => prev.filter(b => b.id !== id));
       setShuffledBookmarks(prev => prev.filter(b => b.id !== id));
+      console.log('✅ Bookmark deleted', id);
       return null;
+    } catch (e) {
+      console.error('deleteBookmark exception', e);
+      try { Alert.alert('Delete exception', String(e)); } catch {}
+      return e?.message || 'Failed to delete bookmark';
     }
-    return error?.message || 'Failed to delete bookmark';
   }
 
   // --- Migration helpers ---
@@ -357,10 +571,21 @@ export function BookmarksProvider({ children }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookmarks', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          // Ignore Supabase events for the bookmark we just updated
-          if (payload.new?.id === lastEditId) return;
-          loadBookmarks();
+        async (payload) => {
+          console.log('supabase bookmarks payload', payload, 'lastEditId=', lastEditId);
+          if (payload.new?.id === lastEditId) {
+            console.log('Skipping reload for self-edit');
+            setLastEditId(null);
+            return;
+          }
+
+          // Mark that this is a realtime sync so loadBookmarks won't reshuffle
+          suppressShuffleRef.current = true;
+          try {
+            await loadBookmarks();
+          } finally {
+            suppressShuffleRef.current = false;
+          }
         }
       )
       .subscribe();
@@ -386,15 +611,18 @@ export function BookmarksProvider({ children }) {
     folders,
     loadingRemote,
     migrating,
+    // add the function here:
+    setFolderHidden,
     addFolder,
     editFolder,
     removeFolder,
-    moveFolder,        // 👈 add this line
+    moveFolder,
     addBookmark,
     updateBookmark,
     deleteBookmark,
     reloadAll: () => {
       if (user) {
+        suppressShuffleRef.current = false;
         loadFolders();
         loadBookmarks();
       }

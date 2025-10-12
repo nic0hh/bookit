@@ -12,11 +12,11 @@ import { BookmarksContext } from '../context/BookmarksContext';
 import { ThemeContext } from '../ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function BookmarkDetailScreen({ route, navigation }) {
+export default function BookmarkDetailScreen({ navigation, route }) {
   const { updateBookmark, deleteBookmark, folders } = useContext(BookmarksContext);
   const { colors, setThemeName } = useContext(ThemeContext);
 
-  const bookmark = route.params?.bookmark;
+  const bookmark = route.params?.bookmark || {}; // adjust to your prop shape
 
   const [title, setTitle] = useState(bookmark?.title || '');
   const [url, setUrl] = useState(bookmark?.url || '');
@@ -108,11 +108,28 @@ export default function BookmarkDetailScreen({ route, navigation }) {
     }
   };
 
-  const openUrl = () => {
-    if (url) {
-      Linking.openURL(url);
-    } else {
+  const openUrl = async () => {
+    if (!url) {
       Alert.alert('No URL', 'This bookmark does not have a valid URL.');
+      return;
+    }
+
+    // Block blob: URLs on native — they are web-only
+    if (typeof url === 'string' && url.startsWith('blob:')) {
+      Alert.alert('Cannot open', 'This preview is only available on web.');
+      return;
+    }
+
+    try {
+      const can = await Linking.canOpenURL(url);
+      if (can) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Cannot open', 'Cannot open this URL on your device.');
+      }
+    } catch (e) {
+      console.warn('openUrl error', e);
+      Alert.alert('Error', 'Failed to open URL.');
     }
   };
 
@@ -199,202 +216,215 @@ export default function BookmarkDetailScreen({ route, navigation }) {
     });
   }, [navigation, colors.text, colors.background]);
 
- return (
-  <SafeAreaView
-    style={{ flex: 1, backgroundColor: colors.background }}
-    edges={['top', 'bottom']}
-  >
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+  async function handleDelete() {
+    console.log('UI triggering delete for', bookmark?.id);
+    if (!bookmark?.id) return;
+    const err = await deleteBookmark(bookmark.id);
+    if (err) {
+      console.warn('deleteBookmark returned error', err);
+      try { Alert.alert('Delete failed', String(err)); } catch {}
+    } else {
+      console.log('delete succeeded');
+      navigation.goBack();
+    }
+  }
+
+  return (
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      edges={['top', 'bottom']}
     >
-      <View
-        style={{
-          flex: 1,
-          borderTopWidth: Platform.OS === 'web' ? 0 : 1,      // remove top border on web
-          borderBottomWidth: Platform.OS === 'web' ? 0 : 1,   // remove bottom border on web
-          borderColor: Platform.OS === 'web' ? 'transparent' : colors.bookmarkBorder, // remove border color on web
-          backgroundColor: colors.card,
-          ...(Platform.OS === 'web'
-            ? {
-                maxWidth: 420,
-                maxHeight: 850,
-                alignSelf: 'center',
-                width: '100%',
-                borderRadius: 24,
-                overflow: 'hidden',
-                marginTop: 40,
-                marginBottom: 40,
-              }
-            : {}),
-        }}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{
-            paddingHorizontal: 20,
-            paddingTop: insets.top,
-            paddingBottom: insets.bottom,
+        <View
+          style={{
+            flex: 1,
+            borderTopWidth: Platform.OS === 'web' ? 0 : 1,      // remove top border on web
+            borderBottomWidth: Platform.OS === 'web' ? 0 : 1,   // remove bottom border on web
+            borderColor: Platform.OS === 'web' ? 'transparent' : colors.bookmarkBorder, // remove border color on web
+            backgroundColor: colors.card,
+            ...(Platform.OS === 'web'
+              ? {
+                  maxWidth: 420,
+                  maxHeight: 850,
+                  alignSelf: 'center',
+                  width: '100%',
+                  borderRadius: 24,
+                  overflow: 'hidden',
+                  marginTop: 40,
+                  marginBottom: 40,
+                }
+              : {}),
           }}
-          keyboardShouldPersistTaps="handled"
         >
-          {/* Title */}
-          <TextInput
-            style={[styles.input, {
-              backgroundColor: colors.inputBackground,
-              color: colors.text,
-              borderColor: colors.inputBorder,
-            }]}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Title"
-            placeholderTextColor={colors.label}
-          />
-
-          {/* URL */}
-          <TextInput
-            style={[styles.input, {
-              backgroundColor: colors.inputBackground,
-              color: colors.text,
-              borderColor: colors.inputBorder,
-            }]}
-            value={url}
-            onChangeText={setUrl}
-            placeholder="URL"
-            placeholderTextColor={colors.label}
-            autoCapitalize="none"
-          />
-          <TouchableOpacity
-            style={[
-              styles.buttonGray,
-              {
-                backgroundColor: colors.actionButton,
-                borderWidth: 0.7,
-                borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
-              }
-            ]}
-            onPress={copyUrl}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingTop: insets.top,
+              paddingBottom: insets.bottom,
+            }}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-              Copy URL
-            </Text>
-          </TouchableOpacity>
-
-          {/* Image */}
-          {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.image} />
-          ) : null}
-          <TouchableOpacity
-            style={[
-              styles.buttonGray,
-              {
-                backgroundColor: colors.actionButton,      // use actionButton color
-                borderWidth: 0.7,
-                borderColor: colors.actionButtonText,      // use actionButtonText color for border
-              }
-            ]}
-            onPress={pickImage}
-          >
-            <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-              Swap / Upload Image
-            </Text>
-          </TouchableOpacity>
-
-          {/* Tags */}
-          <Text style={[styles.label, { color: colors.label }]}>Tags (type and press space):</Text>
-          <View style={[styles.tagsRow, { flexWrap: 'wrap', alignItems: 'flex-start' }]}>
-            {tags.map((tag, idx) => (
-              <View key={idx} style={[styles.tagBubble, { backgroundColor: colors.tag }]}>
-                <Text style={[styles.tagText, { color: colors.tagText }]}>{tag}</Text>
-                <Text
-                  style={[styles.tagRemove, { color: colors.label }]}
-                  onPress={() => removeTag(tag)}
-                >
-                  ×
-                </Text>
-              </View>
-            ))}
+            {/* Title */}
             <TextInput
-              style={[styles.tagInput, {
+              style={[styles.input, {
                 backgroundColor: colors.inputBackground,
                 color: colors.text,
                 borderColor: colors.inputBorder,
               }]}
-              value={tagInput}
-              onChangeText={handleTagInput}
-              placeholder="Add tag"
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Title"
+              placeholderTextColor={colors.label}
+            />
+
+            {/* URL */}
+            <TextInput
+              style={[styles.input, {
+                backgroundColor: colors.inputBackground,
+                color: colors.text,
+                borderColor: colors.inputBorder,
+              }]}
+              value={url}
+              onChangeText={setUrl}
+              placeholder="URL"
               placeholderTextColor={colors.label}
               autoCapitalize="none"
             />
-          </View>
+            <TouchableOpacity
+              style={[
+                styles.buttonGray,
+                {
+                  backgroundColor: colors.actionButton,
+                  borderWidth: 0.7,
+                  borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
+                }
+              ]}
+              onPress={copyUrl}
+            >
+              <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
+                Copy URL
+              </Text>
+            </TouchableOpacity>
 
-          {/* Folder */}
-          <Text style={[styles.label, { color: colors.label }]}>Select Folder:</Text>
-          <CustomPicker
-            value={selectedFolder}
-            options={[
-              { label: 'None', value: null },
-              ...folders.map(f => ({ label: f.name, value: String(f.id) })),
-            ]}
-            onChange={val => setSelectedFolder(val)}
-          />
+            {/* Image */}
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.image} />
+            ) : null}
+            <TouchableOpacity
+              style={[
+                styles.buttonGray,
+                {
+                  backgroundColor: colors.actionButton,      // use actionButton color
+                  borderWidth: 0.7,
+                  borderColor: colors.actionButtonText,      // use actionButtonText color for border
+                }
+              ]}
+              onPress={pickImage}
+            >
+              <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
+                Swap / Upload Image
+              </Text>
+            </TouchableOpacity>
 
-          {/* Save + Delete */}
-          <TouchableOpacity
-            style={[
-              styles.buttonGray,
-              {
-                backgroundColor: colors.actionButton,
-                borderWidth: 0.7,
-                borderColor: colors.actionButtonText,
-                marginTop: 12,
-                marginBottom: 8,
-              }
-            ]}
-            onPress={onSave}
-            disabled={saving}
-          >
-            <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Text>
-          </TouchableOpacity>
+            {/* Tags */}
+            <Text style={[styles.label, { color: colors.label }]}>Tags (type and press space):</Text>
+            <View style={[styles.tagsRow, { flexWrap: 'wrap', alignItems: 'flex-start' }]}>
+              {tags.map((tag, idx) => (
+                <View key={idx} style={[styles.tagBubble, { backgroundColor: colors.tag }]}>
+                  <Text style={[styles.tagText, { color: colors.tagText }]}>{tag}</Text>
+                  <Text
+                    style={[styles.tagRemove, { color: colors.label }]}
+                    onPress={() => removeTag(tag)}
+                  >
+                    ×
+                  </Text>
+                </View>
+              ))}
+              <TextInput
+                style={[styles.tagInput, {
+                  backgroundColor: colors.inputBackground,
+                  color: colors.text,
+                  borderColor: colors.inputBorder,
+                }]}
+                value={tagInput}
+                onChangeText={handleTagInput}
+                placeholder="Add tag"
+                placeholderTextColor={colors.label}
+                autoCapitalize="none"
+              />
+            </View>
 
-          {/* Go to Site button */}
-          <TouchableOpacity
-            style={[
-              styles.buttonGray,
-              {
-                backgroundColor: colors.actionButton,         // match Save Changes button
-                borderWidth: 0.7,
-                borderColor: colors.actionButtonText,         // match Save Changes button
-                marginBottom: 8,
-              }
-            ]}
-            onPress={openUrl}
-          >
-            <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-              Go to Site
-            </Text>
-          </TouchableOpacity>
+            {/* Folder */}
+            <Text style={[styles.label, { color: colors.label }]}>Select Folder:</Text>
+            <CustomPicker
+              value={selectedFolder}
+              options={[
+                { label: 'None', value: null },
+                ...folders.map(f => ({ label: f.name, value: String(f.id) })),
+              ]}
+              onChange={val => setSelectedFolder(val)}
+            />
 
-          <TouchableOpacity
-            style={[
-              styles.buttonGray,
-              { backgroundColor: '#f31919ff', marginTop: 5 }
-            ]}
-            onPress={confirmDelete}
-            disabled={removing}
-          >
-            <Text style={[styles.buttonText, { color: '#fff' }]}>
-              {removing ? 'Deleting...' : 'Delete Bookmark'}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-    </KeyboardAvoidingView>
-  </SafeAreaView>
-);
+            {/* Save + Delete */}
+            <TouchableOpacity
+              style={[
+                styles.buttonGray,
+                {
+                  backgroundColor: colors.actionButton,
+                  borderWidth: 0.7,
+                  borderColor: colors.actionButtonText,
+                  marginTop: 12,
+                  marginBottom: 8,
+                }
+              ]}
+              onPress={onSave}
+              disabled={saving}
+            >
+              <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Go to Site button */}
+            <TouchableOpacity
+              style={[
+                styles.buttonGray,
+                {
+                  backgroundColor: colors.actionButton,         // match Save Changes button
+                  borderWidth: 0.7,
+                  borderColor: colors.actionButtonText,         // match Save Changes button
+                  marginBottom: 8,
+                }
+              ]}
+              onPress={openUrl}
+            >
+              <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
+                Go to Site
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.buttonGray,
+                { backgroundColor: '#f31919ff', marginTop: 5 }
+              ]}
+              onPress={confirmDelete}
+              disabled={removing}
+            >
+              <Text style={[styles.buttonText, { color: '#fff' }]}>
+                {removing ? 'Deleting...' : 'Delete Bookmark'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({

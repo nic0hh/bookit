@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text, ActivityIndicator, Platform, Alert } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text, ActivityIndicator, Platform, Alert, Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import HomeScreen from './screens/HomeScreen';
@@ -211,6 +211,41 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
+// Debug: intercept attempts to open blob: URLs (logs stack + prevents native crash)
+try {
+  const _openURL = Linking.openURL;
+  Linking.openURL = async (url) => {
+    try {
+      if (typeof url === 'string' && url.startsWith('blob:')) {
+        console.log('DEBUG: Linking.openURL called with blob URI:', url);
+        console.trace();
+        // prevent native "No suitable URL request handler" error — adjust behavior as needed
+        return Promise.reject(new Error('Blocked blob: URL'));
+      }
+    } catch (e) {
+      console.warn('DEBUG Linking.openURL wrapper error', e);
+    }
+    return _openURL(url);
+  };
+
+  const _canOpen = Linking.canOpenURL;
+  Linking.canOpenURL = async (url) => {
+    if (typeof url === 'string' && url.startsWith('blob:')) {
+      console.log('DEBUG: Linking.canOpenURL called with blob URI:', url);
+      console.trace();
+      return false;
+    }
+    return _canOpen(url);
+  };
+} catch (e) {
+  console.warn('DEBUG: Linking monkeypatch failed', e);
+}
+
+// Removed the RN.Image replacement block because assigning to RN.Image throws:
+// TypeError: Cannot assign to property 'Image' which has only a getter
+// If you still want image-debugging, create a separate DebugImage component and use it
+// in places where you render <Image /> instead of attempting a global assignment.
 
 // 🔹 Styles for the custom header
 const styles = StyleSheet.create({

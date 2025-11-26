@@ -12,6 +12,7 @@ export default function ProfileScreen({ navigation }) {
   const { user, signOut } = useContext(AuthContext);
   const {
     profile,
+    sharedProfiles = [],
     sharedPermissions = [],
     pendingRequests = [],
     loadSharedPermissions,
@@ -19,6 +20,8 @@ export default function ProfileScreen({ navigation }) {
     acceptShareRequest,
     denyShareRequest,
     updateSharedFolders,
+    activeProfileId,
+    switchActiveProfile,
   } = useContext(ProfilesContext);
   const { colors } = useContext(ThemeContext);
   const { folders } = useContext(BookmarksContext);
@@ -30,6 +33,8 @@ export default function ProfileScreen({ navigation }) {
   const [selectedFolderIds, setSelectedFolderIds] = useState([]);
   const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState(null);
+  const [sharedProfileMenuVisible, setSharedProfileMenuVisible] = useState(false);
+  const [selectedSharedProfile, setSelectedSharedProfile] = useState(null);
   const [blockedModalVisible, setBlockedModalVisible] = useState(false);
   const [blockedEmails, setBlockedEmails] = useState([]);
   const [blockEmail, setBlockEmail] = useState('');
@@ -262,6 +267,85 @@ export default function ProfileScreen({ navigation }) {
                 </View>
               </View>
             ))}
+          </>
+        )}
+
+        {/* Shared Profiles (Viewing Others) */}
+        {sharedProfiles.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 20 }]}>
+              Shared Profiles ({sharedProfiles.length})
+            </Text>
+            {sharedProfiles.map((sharedProfile) => {
+              const isActive = activeProfileId === sharedProfile.owner_id;
+              return (
+                <TouchableOpacity
+                  key={sharedProfile.id}
+                  onPress={() => switchActiveProfile(sharedProfile.owner_id)}
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: isActive ? colors.actionButton : colors.card,
+                    padding: 12,
+                    borderRadius: 12,
+                    marginBottom: 8,
+                    borderWidth: 1,
+                    borderColor: isActive ? colors.actionButtonText : colors.cardBorder,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ 
+                      color: isActive ? colors.actionButtonText : colors.text, 
+                      fontWeight: 'bold',
+                      fontSize: 16,
+                    }}>
+                      {sharedProfile.username}
+                    </Text>
+                    {isActive && (
+                      <Text style={{ color: colors.actionButtonText, fontSize: 12, marginTop: 2 }}>
+                        Currently viewing
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedSharedProfile(sharedProfile);
+                      setSharedProfileMenuVisible(true);
+                    }}
+                    disabled={loading}
+                    style={{
+                      padding: 8,
+                    }}
+                  >
+                    <Ionicons 
+                      name="settings-outline" 
+                      size={24} 
+                      color={isActive ? colors.actionButtonText : colors.text} 
+                    />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              );
+            })}
+            
+            {activeProfileId && activeProfileId !== user?.id && (
+              <TouchableOpacity
+                onPress={() => switchActiveProfile(null)}
+                style={{
+                  backgroundColor: colors.inputBackground,
+                  padding: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  marginTop: 8,
+                  borderWidth: 1,
+                  borderColor: colors.inputBorder,
+                }}
+              >
+                <Text style={{ color: colors.label, fontWeight: 'bold' }}>
+                  Switch Back to My Profile
+                </Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
 
@@ -522,6 +606,83 @@ export default function ProfileScreen({ navigation }) {
 
             <TouchableOpacity
               onPress={() => setSettingsMenuVisible(false)}
+              style={{
+                paddingVertical: 8,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: colors.label }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Shared Profile Settings Modal */}
+      {sharedProfileMenuVisible && selectedSharedProfile && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.card,
+              padding: 20,
+              borderRadius: 16,
+              width: 280,
+              maxWidth: '90%',
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 16, textAlign: 'center' }}>
+              {selectedSharedProfile.username}
+            </Text>
+
+            <TouchableOpacity
+              onPress={async () => {
+                setSharedProfileMenuVisible(false);
+                setLoading(true);
+                try {
+                  // Call the RPC to deny/delete the shared permission from the viewer side
+                  const { error } = await denyShareRequest(selectedSharedProfile.id);
+                  
+                  if (error) {
+                    Alert.alert('Error', error.message || 'Failed to remove shared profile');
+                    return;
+                  }
+
+                  // If we're currently viewing this profile, switch back
+                  if (activeProfileId === selectedSharedProfile.owner_id) {
+                    switchActiveProfile(null);
+                  }
+
+                  Alert.alert('Success', `Removed ${selectedSharedProfile.username} from your shared profiles`);
+                } catch (err) {
+                  console.error('Remove shared profile exception:', err);
+                  Alert.alert('Error', 'Something went wrong');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              style={{
+                backgroundColor: '#ff3b30',
+                paddingVertical: 12,
+                borderRadius: 12,
+                alignItems: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Remove Shared Profile</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setSharedProfileMenuVisible(false)}
               style={{
                 paddingVertical: 8,
                 alignItems: 'center',

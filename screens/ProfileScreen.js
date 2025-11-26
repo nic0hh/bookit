@@ -39,13 +39,39 @@ export default function ProfileScreen({ navigation }) {
   const [blockedEmails, setBlockedEmails] = useState([]);
   const [blockEmail, setBlockEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [myFolders, setMyFolders] = useState([]);
 
   useEffect(() => {
     if (user) {
       loadSharedPermissions();
       loadPendingRequests();
+      loadMyFolders();
     }
   }, [user]);
+
+  // Load MY folders (owner's folders) for sharing management
+  const loadMyFolders = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('folders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('position', { ascending: true });
+
+      if (error) {
+        console.error('loadMyFolders error:', error);
+        setMyFolders([]);
+        return;
+      }
+
+      setMyFolders(data || []);
+    } catch (err) {
+      console.error('loadMyFolders exception:', err);
+      setMyFolders([]);
+    }
+  };
 
   const handleShare = async () => {
     if (!shareEmail.trim()) {
@@ -153,7 +179,7 @@ export default function ProfileScreen({ navigation }) {
     setEditingPermission(perm);
     // If share_all is true, initialize with all folder IDs
     if (perm.share_all) {
-      setSelectedFolderIds(folders.map(f => f.id));
+      setSelectedFolderIds(myFolders.map(f => f.id));
     } else {
       setSelectedFolderIds(perm.folder_ids || []);
     }
@@ -732,10 +758,10 @@ export default function ProfileScreen({ navigation }) {
             </Text>
 
             <ScrollView style={{ marginBottom: 16, maxHeight: 300 }}>
-              {folders.length === 0 ? (
+              {myFolders.length === 0 ? (
                 <Text style={{ color: colors.label, fontStyle: 'italic' }}>No folders created yet</Text>
               ) : (
-                folders.map((folder) => (
+                myFolders.map((folder) => (
                   <TouchableOpacity
                     key={folder.id}
                     onPress={() => toggleFolder(folder.id)}

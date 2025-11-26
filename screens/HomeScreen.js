@@ -21,11 +21,7 @@ function shuffleArray(array) {
 export default function HomeScreen({ navigation }) {
   const { signOut, user } = useContext(AuthContext);
   const { theme, colors, setThemeName } = useContext(ThemeContext);
-  const ctx = useContext(BookmarksContext) || {};
-  const bookmarks = ctx.bookmarks || [];
-  const shuffledBookmarks = ctx.shuffledBookmarks || [];
-  const folders = ctx.folders || [];
-  const loadingRemote = ctx.loadingRemote || false;
+  const { bookmarks = [], folders = [], loading, reloadAll } = useContext(BookmarksContext);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -33,8 +29,8 @@ export default function HomeScreen({ navigation }) {
   const debounceTimeout = useRef(null);
 
   // Local UI state (missing -> caused ReferenceError)
-  const [shuffledLocal, setShuffledBookmarks] = useState(shuffledBookmarks);
-  const [filteredBookmarks, setFilteredBookmarks] = useState(shuffledBookmarks);
+  const [shuffledLocal, setShuffledLocal] = useState([]);
+  const [filteredBookmarks, setFilteredBookmarks] = useState([]);
 
   // Add this ref for web session shuffle
   const shuffledRef = useRef(null);
@@ -47,12 +43,12 @@ export default function HomeScreen({ navigation }) {
         if (!shuffledRef.current) {
           shuffledRef.current = shuffleArray(bookmarks);
         }
-        setShuffledBookmarks(shuffledRef.current);
+        setShuffledLocal(shuffledRef.current);
         setFilteredBookmarks(shuffledRef.current);
       } else {
         // On app, shuffle every time bookmarks change
         const shuffled = shuffleArray(bookmarks);
-        setShuffledBookmarks(shuffled);
+        setShuffledLocal(shuffled);
         setFilteredBookmarks(shuffled);
       }
     }
@@ -64,9 +60,9 @@ export default function HomeScreen({ navigation }) {
     debounceTimeout.current = setTimeout(() => {
       const q = searchQuery.toLowerCase();
       if (!q) {
-        setFilteredBookmarks(shuffledBookmarks);
+        setFilteredBookmarks(shuffledLocal);
       } else {
-        const filtered = shuffledBookmarks.filter(
+        const filtered = shuffledLocal.filter(
           b =>
             b.title?.toLowerCase().includes(q) ||
             b.tags?.some(tag => tag.toLowerCase().includes(q))
@@ -74,7 +70,7 @@ export default function HomeScreen({ navigation }) {
         setFilteredBookmarks(filtered);
       }
     }, 150);
-  }, [searchQuery, shuffledBookmarks]);
+  }, [searchQuery, shuffledLocal]);
 
   // Responsive card width on web
   useEffect(() => {
@@ -99,8 +95,10 @@ export default function HomeScreen({ navigation }) {
 
   // when deriving visible bookmarks:
   const visible = (filteredBookmarks || []).filter(b => {
-    if (!b.folderId) return true;
-    const f = folders.find(x => x.id === b.folderId);
+    // Show bookmarks with no folder (folder_id is null)
+    if (!b.folder_id) return true;
+    // Hide bookmarks from hidden folders
+    const f = folders.find(x => x.id === b.folder_id);
     return !f?.hidden;
   });
   // use `visible` for rendering instead of shuffledBookmarks
@@ -216,7 +214,7 @@ const renderBookmark = ({ item }) => (
           gap: 8, // works for web
         }}
         ListEmptyComponent={
-          !loadingRemote ? (
+          !loading ? (
             <Text style={{ color: colors.label, textAlign: 'center', marginTop: 40, fontFamily: 'sans-serif' }}>
               No bookmarks yet
             </Text>
@@ -337,7 +335,7 @@ const renderBookmark = ({ item }) => (
       </Modal>
 
       {/* Remote loading indicator */}
-      {loadingRemote && (
+      {loading && (
         <View style={{ position: 'absolute', top: 70, left: 0, right: 0, alignItems: 'center' }}>
           <ActivityIndicator color={colors.label} />
         </View>

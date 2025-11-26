@@ -29,7 +29,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
 
   useEffect(() => {
     const inThisFolder = bookmarks.filter(
-      b => String(b.folderId) === String(folderId)
+      b => b.folder_id === folderId
     );
     const base = hasShuffled.current ? inThisFolder : shuffleArray(inThisFolder);
     if (!hasShuffled.current) {

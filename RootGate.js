@@ -1,6 +1,5 @@
 import React, { useContext } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
 import RootStack from './navigation/RootStack';
 import { AuthContext } from './context/AuthContext';
 import { ThemeContext } from './ThemeContext';
@@ -17,9 +16,5 @@ export default function RootGate() {
     );
   }
 
-  return (
-    <NavigationContainer>
-      <RootStack />
-    </NavigationContainer>
-  );
+  return <RootStack />;
 }

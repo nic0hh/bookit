@@ -25,6 +25,7 @@ export default function FoldersScreen({ navigation }) {
   const editFolder = ctx.editFolder;
   const moveFolder = ctx.moveFolder;
   const setFolderHidden = ctx.setFolderHidden;
+  const isViewerMode = ctx.isViewerMode || false;
 
   const [newFolder, setNewFolder] = useState('');
   const [editingFolder, setEditingFolder] = useState(null);
@@ -38,16 +39,25 @@ export default function FoldersScreen({ navigation }) {
   useEffect(() => {
     if (editingFolder) {
       setEditName(editingFolder.name || '');
+      console.log('DEBUG edit modal opened, editingFolder =', editingFolder);
     }
   }, [editingFolder]);
 
   const createFolder = async () => {
     if (!newFolder.trim()) return;
+    if (isViewerMode) {
+      Alert.alert('Read only', 'You are viewing another profile. Creating folders is disabled.');
+      return;
+    }
     await addFolder(newFolder.trim());
     setNewFolder('');
   };
 
   const confirmDelete = (folder) => {
+    if (isViewerMode) {
+      Alert.alert('Read only', 'You are viewing another profile. Deleting folders is disabled.');
+      return;
+    }
     if (Platform.OS === 'web') {
       setEditingFolder(folder);
       setEditName(folder.name);
@@ -89,8 +99,22 @@ export default function FoldersScreen({ navigation }) {
     }
   };
 
+  const renderFolder = ({ item }) => (
+    <TouchableOpacity
+      style={[styles.folderCard, { backgroundColor: colors.card }]}
+      onPress={() => navigation.navigate('FolderBookmarks', { folderId: item.id, folderName: item.name })}
+    >
+      <Text style={[styles.folderName, { color: colors.text }]}>{item.name}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      {isViewerMode && (
+        <View style={{ padding: 10, backgroundColor: '#fff3cd', borderBottomWidth: 1, borderColor: colors.inputBorder }}>
+          <Text style={{ color: '#856404', textAlign: 'center' }}>Viewer mode: showing someone else's folders (read-only)</Text>
+        </View>
+      )}
       {loadingRemote && <ActivityIndicator style={{ marginTop: 40 }} color={colors.label} />}
 
       <FlatList
@@ -176,14 +200,14 @@ export default function FoldersScreen({ navigation }) {
             />
             <TouchableOpacity
               onPress={createFolder}
-              disabled={!newFolder.trim()}
+              disabled={!newFolder.trim() || isViewerMode}
               style={{
                 marginLeft: 10,
                 backgroundColor: colors.actionButton,
                 borderRadius: 12,
                 paddingHorizontal: 18,
                 paddingVertical: 12,
-                opacity: newFolder.trim() ? 1 : 0.5,
+                opacity: newFolder.trim() && !isViewerMode ? 1 : 0.5,
                 borderWidth: 0.7,
                 borderColor: colors.actionButtonText,
                 ...(Platform.OS === 'web' ? { minWidth: 0, maxWidth: 80, paddingHorizontal: 12 } : {}),
@@ -227,10 +251,24 @@ export default function FoldersScreen({ navigation }) {
 
             <TouchableOpacity
               onPress={async () => {
-                const newHidden = !editingFolder?.hidden;
-                await setFolderHidden(editingFolder.id, newHidden);
-                setEditingFolder(prev => ({ ...prev, hidden: newHidden }));
-                setEditModalVisible(false);
+                if (!editingFolder) return;
+                const newHidden = !editingFolder.hidden;
+                console.log('DEBUG toggling folder hidden, id=', editingFolder.id, 'newHidden=', newHidden);
+                
+                try {
+                  const err = await setFolderHidden(editingFolder.id, newHidden);
+                  console.log('DEBUG setFolderHidden result err=', err);
+                  if (err) {
+                    Alert.alert('Error', String(err));
+                    return;
+                  }
+                  // Close modal after successful update
+                  setEditModalVisible(false);
+                  setEditingFolder(null);
+                } catch (e) {
+                  console.warn('setFolderHidden exception', e);
+                  Alert.alert('Error', 'Failed to update folder visibility');
+                }
               }}
               style={{ borderRadius: 15, paddingVertical: 12, alignItems: 'center', marginBottom: 10, borderWidth: 0.7, backgroundColor: editingFolder?.hidden ? '#28a745' : '#ff9f00', borderColor: colors.actionButtonText }}
             >
@@ -279,3 +317,22 @@ export default function FoldersScreen({ navigation }) {
     </SafeAreaView>
   );
 }
+
+const styles = {
+  folderCard: {
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 0.7,
+  },
+  folderName: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+};

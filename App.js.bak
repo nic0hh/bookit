@@ -9,7 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './context/AuthContext';
 import { BookmarksProvider } from './context/BookmarksContext';
 import { ProfilesProvider } from './context/ProfilesContext';
-import { ThemeProvider, ThemeContext } from './ThemeContext';
+import { ThemeProvider } from './ThemeContext';
 
 import HomeScreen from './screens/HomeScreen';
 import AddScreen from './screens/AddScreen';
@@ -17,10 +17,10 @@ import FoldersScreen from './screens/FoldersScreen';
 import { BookmarksContext } from './context/BookmarksContext';
 import BookmarkDetailScreen from './screens/BookmarkDetailScreen';
 import FolderBookmarksScreen from './screens/FolderBookmarksScreen';
-import ProfileScreen from './screens/ProfileScreen';
 import { DefaultTheme, DarkTheme } from '@react-navigation/native';
 import AuthScreen from './screens/AuthScreen';
 import { supabase } from './supabaseClient';
+import RootGate from './RootGate';
 import { AuthContext } from './context/AuthContext';
 
 const Stack = createNativeStackNavigator();
@@ -124,13 +124,6 @@ function MainTabs() {
       />
       <Tab.Screen name="Add" component={AddScreen} />
       <Tab.Screen name="Folders" component={FoldersScreen} />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          title: 'Profile',
-        }}
-      />
     </Tab.Navigator>
   );
 }
@@ -210,17 +203,17 @@ function RootGate() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <ProfilesProvider>
-            <BookmarksProvider>
+      <AuthProvider>
+        <ProfilesProvider>
+          <BookmarksProvider>
+            <ThemeProvider>
               <NavigationContainer>
                 <RootGate />
               </NavigationContainer>
-            </BookmarksProvider>
-          </ProfilesProvider>
-        </AuthProvider>
-      </ThemeProvider>
+            </ThemeProvider>
+          </BookmarksProvider>
+        </ProfilesProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

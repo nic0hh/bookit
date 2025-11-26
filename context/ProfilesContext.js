@@ -265,6 +265,7 @@ export function ProfilesProvider({ children }) {
         created_at: r.created_at,
       }));
 
+      console.log('loadSharedPermissions normalized data:', normalized);
       setSharedPermissions(normalized);
       return normalized;
     } catch (err) {

@@ -176,11 +176,14 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const openEditModal = (perm) => {
+    console.log('openEditModal called with perm:', perm);
     setEditingPermission(perm);
     // If share_all is true, initialize with all folder IDs
     if (perm.share_all) {
+      console.log('share_all is true, selecting all folders:', myFolders.map(f => f.id));
       setSelectedFolderIds(myFolders.map(f => f.id));
     } else {
+      console.log('share_all is false, using folder_ids:', perm.folder_ids);
       setSelectedFolderIds(perm.folder_ids || []);
     }
     setEditModalVisible(true);
@@ -189,22 +192,30 @@ export default function ProfileScreen({ navigation }) {
   const handleUpdateFolders = async () => {
     if (!editingPermission) return;
 
+    console.log('=== UPDATING FOLDERS ===');
+    console.log('Permission ID:', editingPermission.id);
+    console.log('Selected folder IDs:', selectedFolderIds);
+    console.log('Current share_all:', editingPermission.share_all);
+
     setLoading(true);
     try {
       const { error } = await updateSharedFolders(editingPermission.id, selectedFolderIds);
 
       if (error) {
+        console.error('❌ handleUpdateFolders error:', error);
         Alert.alert('Error', error.message || 'Failed to update folders');
         setLoading(false);
         return;
       }
 
+      console.log('✅ Folders updated successfully');
       Alert.alert('Success', 'Folder permissions updated');
       setEditModalVisible(false);
       setEditingPermission(null);
       setSelectedFolderIds([]);
+      await loadMyFolders(); // Reload in case folders changed
     } catch (err) {
-      console.error('handleUpdateFolders exception:', err);
+      console.error('❌ handleUpdateFolders exception:', err);
       Alert.alert('Error', 'Something went wrong');
     } finally {
       setLoading(false);
@@ -212,11 +223,14 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const toggleFolder = (folderId) => {
-    setSelectedFolderIds((prev) =>
-      prev.includes(folderId)
+    console.log('toggleFolder called with:', folderId);
+    setSelectedFolderIds((prev) => {
+      const newIds = prev.includes(folderId)
         ? prev.filter((id) => id !== folderId)
-        : [...prev, folderId]
-    );
+        : [...prev, folderId];
+      console.log('selectedFolderIds updated from', prev, 'to', newIds);
+      return newIds;
+    });
   };
 
   const getStatusBadge = (status) => {

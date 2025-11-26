@@ -288,10 +288,14 @@ export function ProfilesProvider({ children }) {
     if (!user) return { error: 'Not signed in' };
 
     try {
+      console.log('updateSharedFolders called with:', { permissionId, folderIds });
+      
       const { data, error } = await supabase.rpc('update_shared_folders', {
         permission_id: permissionId,
         new_folder_ids: folderIds,
       });
+
+      console.log('updateSharedFolders response:', { data, error });
 
       if (error) {
         console.error('updateSharedFolders error', error);
@@ -299,6 +303,7 @@ export function ProfilesProvider({ children }) {
       }
 
       if (data?.error) {
+        console.error('updateSharedFolders data.error', data.error);
         return { error: data.error };
       }
 

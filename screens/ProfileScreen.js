@@ -169,13 +169,14 @@ export default function ProfileScreen({ navigation }) {
 
       if (error) {
         Alert.alert('Error', error.message || 'Failed to update folders');
+        setLoading(false);
         return;
       }
 
       Alert.alert('Success', 'Folder permissions updated');
       setEditModalVisible(false);
       setEditingPermission(null);
-      await loadSharedPermissions();
+      setSelectedFolderIds([]);
     } catch (err) {
       console.error('handleUpdateFolders exception:', err);
       Alert.alert('Error', 'Something went wrong');

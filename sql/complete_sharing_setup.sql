@@ -191,6 +191,7 @@ begin
   -- Update folder_ids and ensure share_home stays true
   update public.shared_permissions
   set folder_ids = new_folder_ids,
+      share_all = false,
       share_home = true,
       updated_at = now()
   where id = permission_id;

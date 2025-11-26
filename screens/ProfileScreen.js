@@ -151,7 +151,12 @@ export default function ProfileScreen({ navigation }) {
 
   const openEditModal = (perm) => {
     setEditingPermission(perm);
-    setSelectedFolderIds(perm.folder_ids || []);
+    // If share_all is true, initialize with all folder IDs
+    if (perm.share_all) {
+      setSelectedFolderIds(folders.map(f => f.id));
+    } else {
+      setSelectedFolderIds(perm.folder_ids || []);
+    }
     setEditModalVisible(true);
   };
 

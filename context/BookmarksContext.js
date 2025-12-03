@@ -157,6 +157,7 @@ export function BookmarksProvider({ children }) {
     }
 
     reloadAll();
+    return { error: null };
   }
 
   // ---------------------------------------------------------------

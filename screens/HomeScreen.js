@@ -34,14 +34,16 @@ export default function HomeScreen({ navigation }) {
 
   // Add this ref for web session shuffle
   const shuffledRef = useRef(null);
+  const previousBookmarksLength = useRef(0);
 
-  // Shuffle once
+  // Shuffle once, but reset when bookmarks array changes identity (profile switch)
   useEffect(() => {
     if (bookmarks.length > 0) {
       if (Platform.OS === 'web') {
-        // Only shuffle once per session
-        if (!shuffledRef.current) {
+        // Reset shuffle if bookmark count changed significantly (profile switch)
+        if (Math.abs(bookmarks.length - previousBookmarksLength.current) > 5 || !shuffledRef.current) {
           shuffledRef.current = shuffleArray(bookmarks);
+          previousBookmarksLength.current = bookmarks.length;
         }
         setShuffledLocal(shuffledRef.current);
         setFilteredBookmarks(shuffledRef.current);
@@ -51,6 +53,12 @@ export default function HomeScreen({ navigation }) {
         setShuffledLocal(shuffled);
         setFilteredBookmarks(shuffled);
       }
+    } else {
+      // Clear when no bookmarks
+      shuffledRef.current = null;
+      previousBookmarksLength.current = 0;
+      setShuffledLocal([]);
+      setFilteredBookmarks([]);
     }
   }, [bookmarks]);
 

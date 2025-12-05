@@ -36,20 +36,18 @@ export default function HomeScreen({ navigation }) {
   const shuffledRef = useRef(null);
   const previousBookmarksLength = useRef(0);
 
-  // Shuffle once, but reset when bookmarks array changes identity (profile switch)
+  // Always reshuffle when bookmarks array changes
   useEffect(() => {
     if (bookmarks.length > 0) {
+      console.log('Bookmarks changed - reshuffling. Count:', bookmarks.length);
+      const shuffled = shuffleArray(bookmarks);
+      
       if (Platform.OS === 'web') {
-        // Reset shuffle if bookmark count changed significantly (profile switch)
-        if (Math.abs(bookmarks.length - previousBookmarksLength.current) > 5 || !shuffledRef.current) {
-          shuffledRef.current = shuffleArray(bookmarks);
-          previousBookmarksLength.current = bookmarks.length;
-        }
-        setShuffledLocal(shuffledRef.current);
-        setFilteredBookmarks(shuffledRef.current);
+        shuffledRef.current = shuffled;
+        previousBookmarksLength.current = bookmarks.length;
+        setShuffledLocal(shuffled);
+        setFilteredBookmarks(shuffled);
       } else {
-        // On app, shuffle every time bookmarks change
-        const shuffled = shuffleArray(bookmarks);
         setShuffledLocal(shuffled);
         setFilteredBookmarks(shuffled);
       }

@@ -26,8 +26,62 @@ export default function BookmarkDetailScreen({ navigation, route }) {
   const [selectedFolder, setSelectedFolder] = useState(bookmark?.folderId || null);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [refreshingMetadata, setRefreshingMetadata] = useState(false);
 
   const insets = useSafeAreaInsets();
+
+  const refreshMetadata = async () => {
+    if (!url || url.trim().length === 0) {
+      Alert.alert('Error', 'Please enter a URL first');
+      return;
+    }
+
+    setRefreshingMetadata(true);
+    try {
+      console.log('Fetching metadata for:', url);
+      
+      // Use production Netlify function URL
+      const functionUrl = `https://bookitweb.netlify.app/.netlify/functions/fetch-metadata?url=${encodeURIComponent(url.trim())}`;
+      console.log('Calling function at:', functionUrl);
+      
+      const response = await fetch(functionUrl);
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Metadata response:', data);
+      
+      if (data.error) {
+        Alert.alert('Error', data.error);
+        return;
+      }
+
+      // Update with new metadata
+      let updated = false;
+      if (data.title) {
+        setTitle(data.title);
+        updated = true;
+      }
+      if (data.image) {
+        setImageUri(data.image);
+        updated = true;
+      }
+      
+      if (updated) {
+        Alert.alert('Success', 'Metadata refreshed! Click Save to update.');
+      } else {
+        Alert.alert('Info', 'No new metadata found for this URL.');
+      }
+    } catch (err) {
+      console.error('Refresh metadata error:', err);
+      Alert.alert('Error', 'Failed to fetch metadata: ' + err.message);
+    } finally {
+      setRefreshingMetadata(false);
+    }
+  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -86,6 +140,31 @@ export default function BookmarkDetailScreen({ navigation, route }) {
   };
 
   const confirmDelete = () => {
+    console.log('=== confirmDelete called ===');
+    console.log('Platform:', Platform.OS);
+    
+    // On web, Alert.alert doesn't work properly, so just confirm with window.confirm
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to delete this bookmark?');
+      console.log('Web confirm result:', confirmed);
+      if (confirmed) {
+        (async () => {
+          setRemoving(true);
+          console.log('Calling deleteBookmark for:', bookmark.id);
+          const result = await deleteBookmark(bookmark.id);
+          console.log('Delete result:', result);
+          setRemoving(false);
+          if (!result) {
+            navigation.goBack();
+          } else {
+            alert('Failed to delete bookmark: ' + (result.error || result));
+          }
+        })();
+      }
+      return;
+    }
+    
+    // Native Alert.alert for iOS/Android
     Alert.alert('Delete Bookmark', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -93,9 +172,13 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         style: 'destructive',
         onPress: async () => {
           setRemoving(true);
-          await deleteBookmark(bookmark.id);
+          const result = await deleteBookmark(bookmark.id);
           setRemoving(false);
-          navigation.goBack();
+          if (!result) {
+            navigation.goBack();
+          } else {
+            Alert.alert('Error', 'Failed to delete bookmark: ' + (result.error || result));
+          }
         },
       },
     ]);
@@ -217,14 +300,24 @@ export default function BookmarkDetailScreen({ navigation, route }) {
   }, [navigation, colors.text, colors.background]);
 
   async function handleDelete() {
-    console.log('UI triggering delete for', bookmark?.id);
-    if (!bookmark?.id) return;
-    const err = await deleteBookmark(bookmark.id);
-    if (err) {
-      console.warn('deleteBookmark returned error', err);
-      try { Alert.alert('Delete failed', String(err)); } catch {}
+    console.log('=== handleDelete called ===');
+    console.log('bookmark?.id:', bookmark?.id);
+    if (!bookmark?.id) {
+      console.log('❌ No bookmark ID, returning');
+      return;
+    }
+    
+    console.log('Calling deleteBookmark...');
+    const result = await deleteBookmark(bookmark.id);
+    console.log('deleteBookmark returned:', result);
+    console.log('Type of result:', typeof result);
+    console.log('Truthy?', !!result);
+    
+    if (result) {
+      console.warn('❌ deleteBookmark returned error', result);
+      try { Alert.alert('Delete failed', String(result.error || result)); } catch {}
     } else {
-      console.log('delete succeeded');
+      console.log('✅ delete succeeded, navigating back');
       navigation.goBack();
     }
   }
@@ -315,21 +408,44 @@ export default function BookmarkDetailScreen({ navigation, route }) {
             {imageUri ? (
               <Image source={{ uri: imageUri }} style={styles.image} />
             ) : null}
-            <TouchableOpacity
-              style={[
-                styles.buttonGray,
-                {
-                  backgroundColor: colors.actionButton,      // use actionButton color
-                  borderWidth: 0.7,
-                  borderColor: colors.actionButtonText,      // use actionButtonText color for border
-                }
-              ]}
-              onPress={pickImage}
-            >
-              <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-                Swap / Upload Image
-              </Text>
-            </TouchableOpacity>
+            
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              <TouchableOpacity
+                style={[
+                  styles.buttonGray,
+                  {
+                    flex: 1,
+                    backgroundColor: colors.actionButton,
+                    borderWidth: 0.7,
+                    borderColor: colors.actionButtonText,
+                  }
+                ]}
+                onPress={pickImage}
+              >
+                <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
+                  Upload Image
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.buttonGray,
+                  {
+                    flex: 1,
+                    backgroundColor: colors.actionButton,
+                    borderWidth: 0.7,
+                    borderColor: colors.actionButtonText,
+                    opacity: refreshingMetadata ? 0.5 : 1,
+                  }
+                ]}
+                onPress={refreshMetadata}
+                disabled={refreshingMetadata}
+              >
+                <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
+                  {refreshingMetadata ? 'Refreshing...' : 'Refresh Metadata'}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Tags */}
             <Text style={[styles.label, { color: colors.label }]}>Tags (type and press space):</Text>

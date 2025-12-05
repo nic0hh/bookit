@@ -6,7 +6,12 @@ import { ProfilesContext } from "./ProfilesContext";
 export const BookmarksContext = createContext();
 
 export function BookmarksProvider({ children }) {
-  const { effectiveProfileId, isViewingShared } = useContext(ProfilesContext);
+  const profilesContext = useContext(ProfilesContext);
+  console.log('📦 BookmarksProvider - ProfilesContext value:', profilesContext);
+  
+  const { effectiveProfileId, isViewingShared } = profilesContext || {};
+  console.log('📦 BookmarksProvider - effectiveProfileId:', effectiveProfileId);
+  console.log('📦 BookmarksProvider - isViewingShared:', isViewingShared);
 
   const [bookmarks, setBookmarks] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -135,7 +140,7 @@ export function BookmarksProvider({ children }) {
       return { error };
     }
 
-    reloadAll();
+    await reloadAll();
     return { data };
   }
 
@@ -143,21 +148,37 @@ export function BookmarksProvider({ children }) {
   // Delete bookmark (blocked for shared viewers)
   // ---------------------------------------------------------------
   async function deleteBookmark(id) {
-    if (isViewingShared)
+    console.log('=== deleteBookmark called with id:', id);
+    console.log('effectiveProfileId:', effectiveProfileId);
+    console.log('isViewingShared:', isViewingShared);
+    
+    if (isViewingShared) {
+      console.log('❌ Blocked: viewing shared profile');
       return { error: "Cannot delete bookmarks from a shared profile" };
+    }
 
+    if (!effectiveProfileId) {
+      console.log('❌ No effectiveProfileId - cannot delete');
+      return { error: "No profile ID available" };
+    }
+
+    console.log('Calling Supabase delete...');
     const { error } = await supabase
       .from("bookmarks")
       .delete()
       .eq("id", id);
 
+    console.log('Supabase response - error:', error);
+
     if (error) {
-      console.error("deleteBookmark error:", error);
+      console.error("❌ deleteBookmark error:", error);
       return { error };
     }
 
-    reloadAll();
-    return { error: null };
+    console.log('✅ Delete successful, calling reloadAll...');
+    await reloadAll();
+    console.log('Returning null (success)');
+    return null;
   }
 
   // ---------------------------------------------------------------
@@ -183,7 +204,7 @@ export function BookmarksProvider({ children }) {
       return error.message || "Update failed";
     }
 
-    reloadAll();
+    await reloadAll();
     return null;
   }
 

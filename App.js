@@ -81,6 +81,8 @@ function MainTabs() {
             iconName = 'folder-outline';
           } else if (route.name === 'Add') {
             iconName = 'add-circle-outline';
+          } else if (route.name === 'Profile') {
+            iconName = 'person-outline';
           }
           return <Ionicons name={iconName} size={size} color={color} />;
         },

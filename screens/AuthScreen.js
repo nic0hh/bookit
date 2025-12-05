@@ -41,10 +41,9 @@ export default function AuthScreen(props) {
     if (error) {
       setErr(error.message);
     } else if (mode === 'signup') {
-      Alert.alert(
-        'Account Created',
-        'Account created! Check your email to verify your account.'
-      );
+      setInfo('Successful! Please check for an email from Supabase to activate your account.');
+      setEmail('');
+      setPw('');
     } else {
       // Ensure the client has the session (v2 API)
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });

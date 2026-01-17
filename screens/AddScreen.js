@@ -9,7 +9,7 @@ import { ThemeContext } from '../ThemeContext';
 const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
 
 export default function AddScreen({ navigation }) {
-  const { addBookmark, folders } = useContext(BookmarksContext);
+  const { addBookmark, folders, bookmarks } = useContext(BookmarksContext);
   const { colors, setThemeName } = useContext(ThemeContext);
 
   const [url, setUrl] = useState('');
@@ -21,6 +21,7 @@ export default function AddScreen({ navigation }) {
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [previewError, setPreviewError] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -32,6 +33,7 @@ export default function AddScreen({ navigation }) {
       setLocalImage(null);
       setSelectedFolder(null);
       setPreviewError('');
+      setDuplicateWarning(null);
     }, [])
   );
 
@@ -56,6 +58,8 @@ export default function AddScreen({ navigation }) {
           image: data.image || null,
           url,
         });
+        // Check for duplicate after loading preview
+        checkDuplicate(url);
       }
     } catch (err) {
       setPreviewError('Unable to fetch preview for this URL.');
@@ -76,6 +80,10 @@ export default function AddScreen({ navigation }) {
     const finalUrl = (preview.url || url || '').trim();
     if (!finalUrl) return;
 
+    await proceedWithSave(finalUrl);
+  };
+
+  const proceedWithSave = async (finalUrl) => {
     // Validation
     if (finalUrl.length > 2048) {
       Alert.alert('Error', 'URL is too long.');
@@ -98,8 +106,8 @@ export default function AddScreen({ navigation }) {
       title: (preview.title || '').trim(),
       url: finalUrl,
       image: localImage || preview.image || null,
-      tags: normalizeTags(tags), // <--- normalize here
-      folderId: selectedFolder || null,
+      tags: normalizeTags(tags),
+      folderId: selectedFolder,
     });
     navigation.goBack();
   };
@@ -118,6 +126,19 @@ export default function AddScreen({ navigation }) {
 
   const removeTag = (tagToRemove) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
+  const checkDuplicate = (checkUrl) => {
+    const existingBookmark = bookmarks.find(b => b.url === checkUrl);
+    if (existingBookmark) {
+      const existingFolderName = existingBookmark.folder_id
+        ? folders.find(f => f.id === existingBookmark.folder_id)?.name
+        : 'Home';
+      
+      setDuplicateWarning(`Already saved in "${existingFolderName}" (but you can still add a duplicate)`);
+    } else {
+      setDuplicateWarning(null);
+    }
   };
 
   const CustomPicker = ({ value, options, onChange, colors }) => {
@@ -156,7 +177,7 @@ export default function AddScreen({ navigation }) {
                 borderRadius: 16,
                 padding: 16,
                 minWidth: 220,
-                maxHeight: 350, // <-- add this line to make the list scrollable
+                maxHeight: 350,
               }}
             >
               <FlatList
@@ -181,6 +202,123 @@ export default function AddScreen({ navigation }) {
                   </TouchableOpacity>
                 )}
               />
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </View>
+    );  
+  };
+
+  const MultiFolderPicker = ({ selectedIds, folders, onChange, colors }) => {
+    const [visible, setVisible] = useState(false);
+
+    const toggleFolder = (folderId) => {
+      if (selectedIds.includes(folderId)) {
+        onChange(selectedIds.filter(id => id !== folderId));
+      } else {
+        onChange([...selectedIds, folderId]);
+      }
+    };
+
+    const selectedLabel = selectedIds.length === 0
+      ? 'None selected'
+      : selectedIds.length === 1
+      ? folders.find(f => f.id === selectedIds[0])?.name || '1 folder'
+      : `${selectedIds.length} folders`;
+
+    return (
+      <View>
+        <TouchableOpacity
+          style={{
+            borderWidth: 1,
+            borderColor: colors.inputBorder,
+            backgroundColor: colors.inputBackground,
+            borderRadius: 15,
+            padding: 12,
+          }}
+          onPress={() => setVisible(true)}
+        >
+          <Text style={{ color: colors.text }}>{selectedLabel}</Text>
+        </TouchableOpacity>
+        <Modal visible={visible} transparent animationType="fade">
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            onPress={() => setVisible(false)}
+            activeOpacity={1}
+          >
+            <View
+              style={{
+                backgroundColor: colors.card,
+                borderRadius: 16,
+                padding: 16,
+                minWidth: 250,
+                maxHeight: 400,
+              }}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>
+                Select Folders
+              </Text>
+              <FlatList
+                data={folders}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => {
+                  const isSelected = selectedIds.includes(item.id);
+                  return (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingVertical: 12,
+                        paddingHorizontal: 8,
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.inputBorder,
+                      }}
+                      onPress={() => toggleFolder(item.id)}
+                    >
+                      <View
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 4,
+                          borderWidth: 2,
+                          borderColor: colors.actionButton,
+                          backgroundColor: isSelected ? colors.actionButton : 'transparent',
+                          marginRight: 12,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {isSelected && (
+                          <Text style={{ color: colors.card, fontSize: 16, fontWeight: 'bold' }}>✓</Text>
+                        )}
+                      </View>
+                      <Text style={{ color: colors.text, fontSize: 17, flex: 1 }}>
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+              <TouchableOpacity
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  backgroundColor: colors.actionButton,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                }}
+                onPress={() => setVisible(false)}
+              >
+                <Text style={{ color: colors.actionButtonText, fontSize: 16, fontWeight: 'bold' }}>
+                  Done
+                </Text>
+              </TouchableOpacity>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -232,6 +370,12 @@ export default function AddScreen({ navigation }) {
                   onChangeText={(text) => setPreview({ ...preview, title: text })}
                 />
 
+                {duplicateWarning && (
+                  <Text style={{ color: '#ef4444', fontSize: 13, marginTop: -6, marginBottom: 8 }}>
+                    {duplicateWarning}
+                  </Text>
+                )}
+
                 {(preview.image || localImage) ? (
                   <Image
                     source={{ uri: localImage || preview.image }}
@@ -299,9 +443,14 @@ export default function AddScreen({ navigation }) {
                   value={selectedFolder}
                   options={[
                     { label: 'None', value: null },
-                    ...folders.map(f => ({ label: f.name, value: String(f.id) })),
+                    ...folders.map(f => ({ label: f.name, value: f.id })),
                   ]}
-                  onChange={val => setSelectedFolder(val)}
+                  onChange={val => {
+                    setSelectedFolder(val);
+                    if (preview.url || url) {
+                      checkDuplicate(preview.url || url);
+                    }
+                  }}
                   colors={colors}
                 />
 
@@ -347,6 +496,12 @@ export default function AddScreen({ navigation }) {
                   onChangeText={(text) => setPreview({ ...preview, title: text })}
                 />
 
+                {duplicateWarning && (
+                  <Text style={{ color: '#ef4444', fontSize: 13, marginTop: -6, marginBottom: 8 }}>
+                    {duplicateWarning}
+                  </Text>
+                )}
+
                 {(preview.image || localImage) ? (
                   <Image
                     source={{ uri: localImage || preview.image }}
@@ -414,9 +569,14 @@ export default function AddScreen({ navigation }) {
                   value={selectedFolder}
                   options={[
                     { label: 'None', value: null },
-                    ...folders.map(f => ({ label: f.name, value: String(f.id) })),
+                    ...folders.map(f => ({ label: f.name, value: f.id })),
                   ]}
-                  onChange={val => setSelectedFolder(val)}
+                  onChange={val => {
+                    setSelectedFolder(val);
+                    if (preview.url || url) {
+                      checkDuplicate(preview.url || url);
+                    }
+                  }}
                   colors={colors}
                 />
 
@@ -459,10 +619,20 @@ export default function AddScreen({ navigation }) {
               ]}
               value={url}
               onChangeText={setUrl}
+              onBlur={() => {
+                if (url) {
+                  checkDuplicate(url);
+                }
+              }}
               placeholder="https://example.com"
               placeholderTextColor={colors.label}
               autoCapitalize="none"
             />
+            {duplicateWarning && (
+              <Text style={{ color: '#ef4444', fontSize: 13, marginTop: 4, textAlign: Platform.OS === 'web' ? 'center' : 'left' }}>
+                {duplicateWarning}
+              </Text>
+            )}
             <TouchableOpacity
               style={[
                 styles.buttonGray,

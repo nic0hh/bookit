@@ -117,7 +117,7 @@ export function BookmarksProvider({ children }) {
   // ---------------------------------------------------------------
   // Add bookmark (only works for owner; shared viewers blocked)
   // ---------------------------------------------------------------
-  async function addBookmark({ title, url, folder_id }) {
+  async function addBookmark({ title, url, folderId, image, tags }) {
     if (!effectiveProfileId) return { error: "No profile selected" };
     if (isViewingShared)
       return { error: "Cannot add bookmarks to a shared profile" };
@@ -126,7 +126,9 @@ export function BookmarksProvider({ children }) {
       user_id: effectiveProfileId,
       title,
       url,
-      folder_id,
+      folder_id: folderId || null,
+      image,
+      tags,
     };
 
     const { data, error } = await supabase

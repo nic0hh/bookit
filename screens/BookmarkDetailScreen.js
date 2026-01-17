@@ -23,7 +23,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
   const [tags, setTags] = useState(bookmark?.tags || []);
   const [tagInput, setTagInput] = useState('');
   const [imageUri, setImageUri] = useState(bookmark?.image || null);
-  const [selectedFolder, setSelectedFolder] = useState(bookmark?.folderId || null);
+  const [selectedFolder, setSelectedFolder] = useState(bookmark?.folder_id || null);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [refreshingMetadata, setRefreshingMetadata] = useState(false);
@@ -481,7 +481,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
               value={selectedFolder}
               options={[
                 { label: 'None', value: null },
-                ...folders.map(f => ({ label: f.name, value: String(f.id) })),
+                ...folders.map(f => ({ label: f.name, value: f.id })),
               ]}
               onChange={val => setSelectedFolder(val)}
             />

@@ -15,10 +15,11 @@ export default function AddScreen({ navigation }) {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState({ title: '', image: null, url: '' });
+  const [imageDimensions, setImageDimensions] = useState({ width: null, height: null });
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
   const [localImage, setLocalImage] = useState(null);
-  const [selectedFolder, setSelectedFolder] = useState(null);
+  const [selectedFolders, setSelectedFolders] = useState([]);
   const [previewError, setPreviewError] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState(null);
@@ -28,10 +29,11 @@ export default function AddScreen({ navigation }) {
       setUrl('');
       setLoading(false);
       setPreview({ title: '', image: null, url: '' });
+      setImageDimensions({ width: null, height: null });
       setTags([]);
       setTagInput('');
       setLocalImage(null);
-      setSelectedFolder(null);
+      setSelectedFolders([]);
       setPreviewError('');
       setDuplicateWarning(null);
     }, [])
@@ -53,11 +55,32 @@ export default function AddScreen({ navigation }) {
         setPreviewError('Unable to fetch preview for this URL.');
         setPreview({ title: '', image: null, url });
       } else {
+        const imageUrl = data.image || null;
+        
+        // Set preview first
         setPreview({
           title: data.title || '',
-          image: data.image || null,
+          image: imageUrl,
           url,
         });
+        
+        // Get actual image dimensions
+        if (imageUrl) {
+          Image.getSize(
+            imageUrl,
+            (width, height) => {
+              console.log('Got image dimensions:', width, 'x', height);
+              setImageDimensions({ width, height });
+            },
+            (error) => {
+              console.log('Could not get image size:', error);
+              setImageDimensions({ width: null, height: null });
+            }
+          );
+        } else {
+          setImageDimensions({ width: null, height: null });
+        }
+        
         // Check for duplicate after loading preview
         checkDuplicate(url);
       }
@@ -106,9 +129,12 @@ export default function AddScreen({ navigation }) {
       title: (preview.title || '').trim(),
       url: finalUrl,
       image: localImage || preview.image || null,
+      imageWidth: imageDimensions.width,
+      imageHeight: imageDimensions.height,
       tags: normalizeTags(tags),
-      folderId: selectedFolder,
+      folderIds: selectedFolders,
     });
+    console.log('Saving with dimensions:', imageDimensions);
     navigation.goBack();
   };
 
@@ -131,11 +157,17 @@ export default function AddScreen({ navigation }) {
   const checkDuplicate = (checkUrl) => {
     const existingBookmark = bookmarks.find(b => b.url === checkUrl);
     if (existingBookmark) {
-      const existingFolderName = existingBookmark.folder_id
-        ? folders.find(f => f.id === existingBookmark.folder_id)?.name
-        : 'Home';
+      // Handle both new folder_ids array and legacy folder_id
+      const folderIds = existingBookmark.folder_ids || (existingBookmark.folder_id ? [existingBookmark.folder_id] : []);
       
-      setDuplicateWarning(`Already saved in "${existingFolderName}" (but you can still add a duplicate)`);
+      if (folderIds.length === 0) {
+        setDuplicateWarning(`Already saved in "Home" (but you can still add to folders)`);
+      } else if (folderIds.length === 1) {
+        const folderName = folders.find(f => f.id === folderIds[0])?.name || 'a folder';
+        setDuplicateWarning(`Already saved in "${folderName}" (but you can still add to other folders)`);
+      } else {
+        setDuplicateWarning(`Already saved in ${folderIds.length} folders (but you can still add to others)`);
+      }
     } else {
       setDuplicateWarning(null);
     }
@@ -438,15 +470,12 @@ export default function AddScreen({ navigation }) {
                   </View>
                 </ScrollView>
 
-                <Text style={[styles.label, { color: colors.text }]}>Select Folder:</Text>
-                <CustomPicker
-                  value={selectedFolder}
-                  options={[
-                    { label: 'None', value: null },
-                    ...folders.map(f => ({ label: f.name, value: f.id })),
-                  ]}
-                  onChange={val => {
-                    setSelectedFolder(val);
+                <Text style={[styles.label, { color: colors.text }]}>Select Folders:</Text>
+                <MultiFolderPicker
+                  selectedIds={selectedFolders}
+                  folders={folders}
+                  onChange={(ids) => {
+                    setSelectedFolders(ids);
                     if (preview.url || url) {
                       checkDuplicate(preview.url || url);
                     }
@@ -564,15 +593,12 @@ export default function AddScreen({ navigation }) {
                   </View>
                 </ScrollView>
 
-                <Text style={[styles.label, { color: colors.text }]}>Select Folder:</Text>
-                <CustomPicker
-                  value={selectedFolder}
-                  options={[
-                    { label: 'None', value: null },
-                    ...folders.map(f => ({ label: f.name, value: f.id })),
-                  ]}
-                  onChange={val => {
-                    setSelectedFolder(val);
+                <Text style={[styles.label, { color: colors.text }]}>Select Folders:</Text>
+                <MultiFolderPicker
+                  selectedIds={selectedFolders}
+                  folders={folders}
+                  onChange={(ids) => {
+                    setSelectedFolders(ids);
                     if (preview.url || url) {
                       checkDuplicate(preview.url || url);
                     }

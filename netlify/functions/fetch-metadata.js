@@ -53,9 +53,33 @@ exports.handler = async function(event) {
       ''
     ).trim();
 
+    // Get image dimensions if image URL exists
+    let imageWidth = null;
+    let imageHeight = null;
+    
+    if (image) {
+      try {
+        const imageResponse = await fetch(image, {
+          method: 'HEAD',
+          headers: { 'User-Agent': 'BookitBot/1.0' }
+        });
+        
+        // Try to get dimensions from og:image meta tags
+        const ogWidth = $('meta[property="og:image:width"]').attr('content');
+        const ogHeight = $('meta[property="og:image:height"]').attr('content');
+        
+        if (ogWidth && ogHeight) {
+          imageWidth = parseInt(ogWidth);
+          imageHeight = parseInt(ogHeight);
+        }
+      } catch (err) {
+        console.log('Could not fetch image dimensions:', err.message);
+      }
+    }
+
     return {
       statusCode: 200,
-      body: JSON.stringify({ title, image, description }),
+      body: JSON.stringify({ title, image, description, imageWidth, imageHeight }),
       headers: corsHeaders
     };
   } catch (e) {

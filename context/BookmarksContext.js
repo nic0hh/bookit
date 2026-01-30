@@ -80,31 +80,53 @@ export function BookmarksProvider({ children }) {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch bookmarks
+      const { data: bookmarksData, error: bookmarksError } = await supabase
         .from("bookmarks")
         .select("*")
         .eq("user_id", effectiveProfileId)
         .order("created_at", { ascending: false });
 
-      console.log("DEBUG bookmarks fetched ->", { data, error });
-      if (data) {
-        console.log("DEBUG bookmarks count:", data.length);
-        console.log("DEBUG first bookmark:", JSON.stringify(data[0], null, 2));
-      } else {
-        console.log("DEBUG bookmarks data is null/undefined");
-      }
-      if (error) {
-        console.log("DEBUG bookmarks error:", JSON.stringify(error, null, 2));
-      }
-
-      if (error) {
-        console.error("loadBookmarks error:", error);
+      if (bookmarksError) {
+        console.error("loadBookmarks error:", bookmarksError);
         setBookmarks([]);
         return [];
       }
 
-      setBookmarks(data || []);
-      return data || [];
+      // Fetch folder relationships from junction table
+      const { data: junctionData, error: junctionError } = await supabase
+        .from("bookmark_folders")
+        .select("bookmark_id, folder_id");
+
+      if (junctionError) {
+        console.error("loadBookmarks junction error:", junctionError);
+      }
+
+      // Map folder IDs to each bookmark
+      const bookmarksWithFolders = (bookmarksData || []).map(bookmark => {
+        const folderIds = (junctionData || [])
+          .filter(j => j.bookmark_id === bookmark.id)
+          .map(j => j.folder_id);
+        
+        return {
+          ...bookmark,
+          folder_ids: folderIds,
+          // Keep folder_id for backward compatibility (use first folder or legacy value)
+          folder_id: folderIds.length > 0 ? folderIds[0] : bookmark.folder_id
+        };
+      });
+
+      console.log("DEBUG bookmarks count:", bookmarksWithFolders.length);
+      if (bookmarksWithFolders[0]) {
+        console.log("DEBUG first bookmark:", JSON.stringify(bookmarksWithFolders[0], null, 2));
+        console.log("DEBUG image dimensions:", {
+          width: bookmarksWithFolders[0].image_width,
+          height: bookmarksWithFolders[0].image_height
+        });
+      }
+
+      setBookmarks(bookmarksWithFolders);
+      return bookmarksWithFolders;
     } catch (err) {
       console.error("loadBookmarks exception:", err);
       setBookmarks([]);
@@ -117,17 +139,22 @@ export function BookmarksProvider({ children }) {
   // ---------------------------------------------------------------
   // Add bookmark (only works for owner; shared viewers blocked)
   // ---------------------------------------------------------------
-  async function addBookmark({ title, url, folderId, image, tags }) {
+  async function addBookmark({ title, url, folderIds, folderId, image, imageWidth, imageHeight, tags }) {
     if (!effectiveProfileId) return { error: "No profile selected" };
     if (isViewingShared)
       return { error: "Cannot add bookmarks to a shared profile" };
+
+    // Support both folderIds array (new) and folderId single value (backward compat)
+    const folders = folderIds || (folderId ? [folderId] : []);
 
     const insert = {
       user_id: effectiveProfileId,
       title,
       url,
-      folder_id: folderId || null,
+      folder_id: folders.length > 0 ? folders[0] : null, // Keep legacy column
       image,
+      image_width: imageWidth,
+      image_height: imageHeight,
       tags,
     };
 
@@ -140,6 +167,22 @@ export function BookmarksProvider({ children }) {
     if (error) {
       console.error("addBookmark error:", error);
       return { error };
+    }
+
+    // Insert into junction table for each folder
+    if (folders.length > 0) {
+      const junctionInserts = folders.map(fId => ({
+        bookmark_id: data.id,
+        folder_id: fId
+      }));
+
+      const { error: junctionError } = await supabase
+        .from("bookmark_folders")
+        .insert(junctionInserts);
+
+      if (junctionError) {
+        console.error("addBookmark junction error:", junctionError);
+      }
     }
 
     await reloadAll();
@@ -190,20 +233,52 @@ export function BookmarksProvider({ children }) {
     if (isViewingShared)
       return { error: "Cannot update bookmarks in a shared profile" };
 
+    // Support both folderIds array (new) and folderId single value (backward compat)
+    const folders = updates.folderIds || (updates.folderId ? [updates.folderId] : []);
+
     const { error } = await supabase
       .from("bookmarks")
       .update({
         title: updates.title,
         url: updates.url,
         tags: updates.tags,
-        folder_id: updates.folderId,
+        folder_id: folders.length > 0 ? folders[0] : null, // Keep legacy column
         image: updates.image,
+        image_width: updates.imageWidth,
+        image_height: updates.imageHeight,
+        image_position_x: updates.imagePositionX,
+        image_position_y: updates.imagePositionY,
       })
       .eq("id", id);
 
     if (error) {
       console.error("updateBookmark error:", error);
       return error.message || "Update failed";
+    }
+
+    // Update junction table if folderIds provided
+    if (updates.folderIds !== undefined) {
+      // Delete existing folder relationships
+      await supabase
+        .from("bookmark_folders")
+        .delete()
+        .eq("bookmark_id", id);
+
+      // Insert new relationships
+      if (folders.length > 0) {
+        const junctionInserts = folders.map(fId => ({
+          bookmark_id: id,
+          folder_id: fId
+        }));
+
+        const { error: junctionError } = await supabase
+          .from("bookmark_folders")
+          .insert(junctionInserts);
+
+        if (junctionError) {
+          console.error("updateBookmark junction error:", junctionError);
+        }
+      }
     }
 
     await reloadAll();

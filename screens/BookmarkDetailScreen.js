@@ -23,7 +23,9 @@ export default function BookmarkDetailScreen({ navigation, route }) {
   const [tags, setTags] = useState(bookmark?.tags || []);
   const [tagInput, setTagInput] = useState('');
   const [imageUri, setImageUri] = useState(bookmark?.image || null);
-  const [selectedFolder, setSelectedFolder] = useState(bookmark?.folder_id || null);
+  const [selectedFolders, setSelectedFolders] = useState(
+    bookmark?.folder_ids || (bookmark?.folder_id ? [bookmark.folder_id] : [])
+  );
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [refreshingMetadata, setRefreshingMetadata] = useState(false);
@@ -130,7 +132,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       title: title.trim(),
       url: url.trim(),
       tags: normalizeTags(tags),
-      folderId: selectedFolder || null,
+      folderIds: selectedFolders,
       image: imageUri || null,
     });
     setSaving(false);
@@ -216,10 +218,23 @@ export default function BookmarkDetailScreen({ navigation, route }) {
     }
   };
 
-  // 🔹 Folder picker copied from AddScreen
-  const CustomPicker = ({ value, options, onChange }) => {
+  // 🔹 Multi-folder picker
+  const MultiFolderPicker = ({ selectedIds, folders, onChange }) => {
     const [visible, setVisible] = useState(false);
-    const selectedLabel = options.find(opt => opt.value === value)?.label || 'None';
+
+    const toggleFolder = (folderId) => {
+      if (selectedIds.includes(folderId)) {
+        onChange(selectedIds.filter(id => id !== folderId));
+      } else {
+        onChange([...selectedIds, folderId]);
+      }
+    };
+
+    const selectedLabel = selectedIds.length === 0
+      ? 'None selected'
+      : selectedIds.length === 1
+      ? folders.find(f => f.id === selectedIds[0])?.name || '1 folder'
+      : `${selectedIds.length} folders`;
 
     return (
       <View>
@@ -238,8 +253,10 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         <Modal visible={visible} transparent animationType="fade">
           <TouchableOpacity
             style={{
-              flex: 1, backgroundColor: 'rgba(0,0,0,0.3)',
-              justifyContent: 'center', alignItems: 'center',
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              justifyContent: 'center',
+              alignItems: 'center',
             }}
             onPress={() => setVisible(false)}
             activeOpacity={1}
@@ -249,28 +266,69 @@ export default function BookmarkDetailScreen({ navigation, route }) {
                 backgroundColor: colors.card,
                 borderRadius: 16,
                 padding: 16,
-                minWidth: 220,
-                maxHeight: 350,
+                minWidth: 250,
+                maxHeight: 400,
               }}
+              onStartShouldSetResponder={() => true}
             >
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>
+                Select Folders
+              </Text>
               <FlatList
-                data={options}
-                keyExtractor={item => String(item.value)}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={{
-                      paddingVertical: 12, paddingHorizontal: 8,
-                      borderBottomWidth: 1, borderBottomColor: colors.inputBorder,
-                    }}
-                    onPress={() => {
-                      onChange(item.value);
-                      setVisible(false);
-                    }}
-                  >
-                    <Text style={{ color: colors.pickerText, fontSize: 17 }}>{item.label}</Text>
-                  </TouchableOpacity>
-                )}
+                data={folders}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => {
+                  const isSelected = selectedIds.includes(item.id);
+                  return (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingVertical: 12,
+                        paddingHorizontal: 8,
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.inputBorder,
+                      }}
+                      onPress={() => toggleFolder(item.id)}
+                    >
+                      <View
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 4,
+                          borderWidth: 2,
+                          borderColor: colors.actionButton,
+                          backgroundColor: isSelected ? colors.actionButton : 'transparent',
+                          marginRight: 12,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {isSelected && (
+                          <Text style={{ color: colors.card, fontSize: 16, fontWeight: 'bold' }}>✓</Text>
+                        )}
+                      </View>
+                      <Text style={{ color: colors.pickerText, fontSize: 17, flex: 1 }}>
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }}
               />
+              <TouchableOpacity
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  backgroundColor: colors.actionButton,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                }}
+                onPress={() => setVisible(false)}
+              >
+                <Text style={{ color: colors.actionButtonText, fontSize: 16, fontWeight: 'bold' }}>
+                  Done
+                </Text>
+              </TouchableOpacity>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -404,9 +462,46 @@ export default function BookmarkDetailScreen({ navigation, route }) {
               </Text>
             </TouchableOpacity>
 
-            {/* Image */}
+            {/* Image with position adjustment */}
             {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.image} />
+              <View style={{ marginVertical: 10 }}>
+                {Platform.OS === 'web' ? (
+                  <img
+                    src={imageUri}
+                    alt={title || 'Bookmark'}
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      maxHeight: '500px',
+                      objectFit: 'contain',
+                      borderRadius: '12px',
+                      border: `1px solid ${colors.inputBorder}`,
+                    }}
+                  />
+                ) : (
+                  <View 
+                    style={{ 
+                      width: '100%', 
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: colors.inputBorder,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Image 
+                      source={{ uri: imageUri }} 
+                      style={{
+                        width: '100%',
+                        height: undefined,
+                        aspectRatio: bookmark?.image_width && bookmark?.image_height
+                          ? bookmark.image_width / bookmark.image_height
+                          : 1.5,
+                      }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                )}
+              </View>
             ) : null}
             
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
@@ -476,14 +571,11 @@ export default function BookmarkDetailScreen({ navigation, route }) {
             </View>
 
             {/* Folder */}
-            <Text style={[styles.label, { color: colors.label }]}>Select Folder:</Text>
-            <CustomPicker
-              value={selectedFolder}
-              options={[
-                { label: 'None', value: null },
-                ...folders.map(f => ({ label: f.name, value: f.id })),
-              ]}
-              onChange={val => setSelectedFolder(val)}
+            <Text style={[styles.label, { color: colors.label }]}>Select Folders:</Text>
+            <MultiFolderPicker
+              selectedIds={selectedFolders}
+              folders={folders}
+              onChange={setSelectedFolders}
             />
 
             {/* Save + Delete */}
@@ -548,7 +640,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 15,
     padding: 12,
-    marginVertical: 10,
+    marginVertical: 6,
     fontSize: 16,
   },
   label: {
@@ -558,9 +650,8 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: 200,
     marginVertical: 10,
-    resizeMode: 'cover',
+    resizeMode: 'contain',
     borderRadius: 12,
   },
   tagsRow: {
@@ -601,7 +692,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     paddingVertical: 12,
     alignItems: 'center',
-    marginVertical: 10,
+    marginVertical: 6,
   },
   buttonText: {
     fontSize: 16,

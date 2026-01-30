@@ -13,14 +13,16 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "requireFullScreen": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "softwareKeyboardLayoutMode": "pan",
+      "package": "com.nic0h.Bookit"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -30,7 +32,7 @@
         }
       },
       "meta": {
-        "viewport": "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        "viewport": "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
       }
     },
     "plugins": [

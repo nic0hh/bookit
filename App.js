@@ -23,6 +23,35 @@ import AuthScreen from './screens/AuthScreen';
 import { supabase } from './supabaseClient';
 import { AuthContext } from './context/AuthContext';
 
+// Prevent zoom on mobile web browsers
+if (Platform.OS === 'web') {
+  const style = document.createElement('style');
+  style.textContent = `
+    * {
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    input, textarea, select {
+      -webkit-user-select: text;
+      font-size: 16px !important;
+    }
+    body {
+      overflow: hidden;
+      position: fixed;
+      width: 100%;
+      height: 100%;
+    }
+    #root {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 

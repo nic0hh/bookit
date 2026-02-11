@@ -4,6 +4,7 @@ import { supabase } from "../supabaseClient";
 import { ProfilesContext } from "./ProfilesContext";
 
 export const BookmarksContext = createContext();
+const STORAGE_BUCKET = 'bookmark-images';
 
 export function BookmarksProvider({ children }) {
   const profilesContext = useContext(ProfilesContext);
@@ -103,18 +104,35 @@ export function BookmarksProvider({ children }) {
       }
 
       // Map folder IDs to each bookmark
-      const bookmarksWithFolders = (bookmarksData || []).map(bookmark => {
-        const folderIds = (junctionData || [])
-          .filter(j => j.bookmark_id === bookmark.id)
-          .map(j => j.folder_id);
-        
-        return {
-          ...bookmark,
-          folder_ids: folderIds,
-          // Keep folder_id for backward compatibility (use first folder or legacy value)
-          folder_id: folderIds.length > 0 ? folderIds[0] : bookmark.folder_id
-        };
-      });
+      const bookmarksWithFolders = await Promise.all(
+        (bookmarksData || []).map(async (bookmark) => {
+          const folderIds = (junctionData || [])
+            .filter(j => j.bookmark_id === bookmark.id)
+            .map(j => j.folder_id);
+
+          let signedImageUrl = bookmark.image || null;
+          if (bookmark.image_path) {
+            const { data: signedData, error: signedError } = await supabase
+              .storage
+              .from(STORAGE_BUCKET)
+              .createSignedUrl(bookmark.image_path, 60 * 60);
+
+            if (signedError) {
+              console.error('createSignedUrl error:', signedError);
+            } else {
+              signedImageUrl = signedData?.signedUrl || signedImageUrl;
+            }
+          }
+
+          return {
+            ...bookmark,
+            image: signedImageUrl,
+            folder_ids: folderIds,
+            // Keep folder_id for backward compatibility (use first folder or legacy value)
+            folder_id: folderIds.length > 0 ? folderIds[0] : bookmark.folder_id,
+          };
+        })
+      );
 
       console.log("DEBUG bookmarks count:", bookmarksWithFolders.length);
       if (bookmarksWithFolders[0]) {
@@ -139,7 +157,7 @@ export function BookmarksProvider({ children }) {
   // ---------------------------------------------------------------
   // Add bookmark (only works for owner; shared viewers blocked)
   // ---------------------------------------------------------------
-  async function addBookmark({ title, url, folderIds, folderId, image, imageWidth, imageHeight, tags }) {
+  async function addBookmark({ title, url, folderIds, folderId, image, imagePath, imageWidth, imageHeight, tags }) {
     if (!effectiveProfileId) return { error: "No profile selected" };
     if (isViewingShared)
       return { error: "Cannot add bookmarks to a shared profile" };
@@ -153,6 +171,7 @@ export function BookmarksProvider({ children }) {
       url,
       folder_id: folders.length > 0 ? folders[0] : null, // Keep legacy column
       image,
+      image_path: imagePath,
       image_width: imageWidth,
       image_height: imageHeight,
       tags,
@@ -244,6 +263,7 @@ export function BookmarksProvider({ children }) {
         tags: updates.tags,
         folder_id: folders.length > 0 ? folders[0] : null, // Keep legacy column
         image: updates.image,
+        image_path: updates.imagePath,
         image_width: updates.imageWidth,
         image_height: updates.imageHeight,
         image_position_x: updates.imagePositionX,

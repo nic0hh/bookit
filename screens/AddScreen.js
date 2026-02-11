@@ -5,8 +5,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemeContext } from '../ThemeContext';
+import { supabase } from '../supabaseClient';
 
 const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
+const STORAGE_BUCKET = 'bookmark-images';
 
 export default function AddScreen({ navigation }) {
   const { addBookmark, folders, bookmarks } = useContext(BookmarksContext);
@@ -92,10 +94,55 @@ export default function AddScreen({ navigation }) {
     setLoading(false);
   };
 
+  const isRemoteUrl = (uri) => /^https?:\/\//i.test(uri);
+
+  const uploadImageIfNeeded = async (uri) => {
+    if (!uri) return { imageUrl: null, imagePath: null };
+    if (isRemoteUrl(uri)) return { imageUrl: uri, imagePath: null };
+
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      const ext = (uri.split('.').pop() || 'jpg').split('?')[0].toLowerCase();
+      const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'].includes(ext) ? ext : 'jpg';
+      const contentType = safeExt === 'jpg' ? 'image/jpeg' : `image/${safeExt}`;
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
+      const filePath = `uploads/${fileName}`;
+
+      const { error: uploadError } = await supabase
+        .storage
+        .from(STORAGE_BUCKET)
+        .upload(filePath, blob, { contentType, upsert: true });
+
+      if (uploadError) {
+        console.error('Image upload error:', uploadError);
+        Alert.alert('Upload failed', 'Could not upload the selected image.');
+        return null;
+      }
+
+      return { imageUrl: null, imagePath: filePath };
+    } catch (err) {
+      console.error('Image upload exception:', err);
+      Alert.alert('Upload failed', 'Could not upload the selected image.');
+      return null;
+    }
+  };
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images });
     if (!result.cancelled && result.assets && result.assets.length > 0) {
-      setLocalImage(result.assets[0].uri);
+      const asset = result.assets[0];
+      setLocalImage(asset.uri);
+      if (asset.width && asset.height) {
+        setImageDimensions({ width: asset.width, height: asset.height });
+      } else {
+        Image.getSize(
+          asset.uri,
+          (width, height) => setImageDimensions({ width, height }),
+          () => setImageDimensions({ width: null, height: null })
+        );
+      }
     }
   };
 
@@ -125,10 +172,18 @@ export default function AddScreen({ navigation }) {
       return;
     }
 
+    const originalImage = localImage || preview.image || null;
+    const uploadResult = await uploadImageIfNeeded(originalImage);
+
+    if (originalImage && !uploadResult) {
+      return;
+    }
+
     await addBookmark({
       title: (preview.title || '').trim(),
       url: finalUrl,
-      image: localImage || preview.image || null,
+      image: uploadResult?.imageUrl || null,
+      imagePath: uploadResult?.imagePath || null,
       imageWidth: imageDimensions.width,
       imageHeight: imageDimensions.height,
       tags: normalizeTags(tags),
@@ -381,7 +436,7 @@ export default function AddScreen({ navigation }) {
               style={[
                 styles.preview,
                 { backgroundColor: colors.card },
-                { width: 400, alignSelf: 'center', height: 650, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+                { width: '100%', maxWidth: 400, alignSelf: 'center', maxHeight: 650, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
               ]}
             >
               <ScrollView
@@ -640,7 +695,7 @@ export default function AddScreen({ navigation }) {
                   backgroundColor: colors.inputBackground,
                   color: colors.text,
                   borderColor: colors.inputBorder,
-                  ...(Platform.OS === 'web' ? { width: 400, alignSelf: 'center' } : {}),
+                  ...(Platform.OS === 'web' ? { width: '100%', maxWidth: 400, alignSelf: 'center' } : {}),
                 },
               ]}
               value={url}
@@ -756,7 +811,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     height: 32,
     minWidth: 80,
-    fontSize: 15,
+    fontSize: 16,
   },
   buttonGray: {
     borderRadius: 15,

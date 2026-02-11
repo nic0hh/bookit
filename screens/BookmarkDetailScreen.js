@@ -11,6 +11,9 @@ import * as Clipboard from 'expo-clipboard';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { ThemeContext } from '../ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../supabaseClient';
+
+const STORAGE_BUCKET = 'bookmark-images';
 
 export default function BookmarkDetailScreen({ navigation, route }) {
   const { updateBookmark, deleteBookmark, folders } = useContext(BookmarksContext);
@@ -23,6 +26,11 @@ export default function BookmarkDetailScreen({ navigation, route }) {
   const [tags, setTags] = useState(bookmark?.tags || []);
   const [tagInput, setTagInput] = useState('');
   const [imageUri, setImageUri] = useState(bookmark?.image || null);
+  const [imageDimensions, setImageDimensions] = useState({
+    width: bookmark?.image_width || null,
+    height: bookmark?.image_height || null,
+  });
+  const [imagePath, setImagePath] = useState(bookmark?.image_path || null);
   const [selectedFolders, setSelectedFolders] = useState(
     bookmark?.folder_ids || (bookmark?.folder_id ? [bookmark.folder_id] : [])
   );
@@ -69,6 +77,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       }
       if (data.image) {
         setImageUri(data.image);
+        setImagePath(null);
         updated = true;
       }
       
@@ -85,12 +94,57 @@ export default function BookmarkDetailScreen({ navigation, route }) {
     }
   };
 
+  const isRemoteUrl = (uri) => /^https?:\/\//i.test(uri);
+
+  const uploadImageIfNeeded = async (uri) => {
+    if (!uri || isRemoteUrl(uri)) return null;
+
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      const ext = (uri.split('.').pop() || 'jpg').split('?')[0].toLowerCase();
+      const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'].includes(ext) ? ext : 'jpg';
+      const contentType = safeExt === 'jpg' ? 'image/jpeg' : `image/${safeExt}`;
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
+      const filePath = `uploads/${fileName}`;
+
+      const { error: uploadError } = await supabase
+        .storage
+        .from(STORAGE_BUCKET)
+        .upload(filePath, blob, { contentType, upsert: true });
+
+      if (uploadError) {
+        console.error('Image upload error:', uploadError);
+        Alert.alert('Upload failed', 'Could not upload the selected image.');
+        return null;
+      }
+
+      return filePath;
+    } catch (err) {
+      console.error('Image upload exception:', err);
+      Alert.alert('Upload failed', 'Could not upload the selected image.');
+      return null;
+    }
+  };
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images
     });
     if (!result.canceled && result.assets?.length > 0) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setImageUri(asset.uri);
+      setImagePath(null);
+      if (asset.width && asset.height) {
+        setImageDimensions({ width: asset.width, height: asset.height });
+      } else {
+        Image.getSize(
+          asset.uri,
+          (width, height) => setImageDimensions({ width, height }),
+          () => setImageDimensions({ width: null, height: null })
+        );
+      }
     }
   };
 
@@ -128,12 +182,37 @@ export default function BookmarkDetailScreen({ navigation, route }) {
     }
 
     setSaving(true);
+    const originalImage = imageUri || null;
+    let imageUrlToSave = null;
+    let imagePathToSave = imagePath || null;
+
+    if (originalImage && !isRemoteUrl(originalImage)) {
+      const uploadResult = await uploadImageIfNeeded(originalImage);
+      if (!uploadResult) {
+        setSaving(false);
+        return;
+      }
+      imagePathToSave = uploadResult;
+      imageUrlToSave = null;
+    } else if (!imagePathToSave) {
+      imageUrlToSave = originalImage || null;
+      imagePathToSave = null;
+    }
+
+    if (originalImage && !imageUrlToSave && !imagePathToSave) {
+      setSaving(false);
+      return;
+    }
+
     const err = await updateBookmark(bookmark.id, {
       title: title.trim(),
       url: url.trim(),
       tags: normalizeTags(tags),
       folderIds: selectedFolders,
-      image: imageUri || null,
+      image: imageUrlToSave,
+      imagePath: imagePathToSave,
+      imageWidth: imageDimensions.width ?? bookmark?.image_width ?? null,
+      imageHeight: imageDimensions.height ?? bookmark?.image_height ?? null,
     });
     setSaving(false);
 

@@ -10,6 +10,13 @@ import { AuthProvider } from './context/AuthContext';
 import { BookmarksProvider } from './context/BookmarksContext';
 import { ProfilesProvider } from './context/ProfilesContext';
 import { ThemeProvider, ThemeContext } from './ThemeContext';
+import {
+  useFonts,
+  Quicksand_400Regular,
+  Quicksand_500Medium,
+  Quicksand_600SemiBold,
+  Quicksand_700Bold,
+} from '@expo-google-fonts/quicksand';
 
 import HomeScreen from './screens/HomeScreen';
 import AddScreen from './screens/AddScreen';
@@ -27,15 +34,17 @@ import { AuthContext } from './context/AuthContext';
 if (Platform.OS === 'web') {
   const style = document.createElement('style');
   style.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
     * {
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
     input, textarea, select {
       -webkit-user-select: text;
       font-size: 16px !important;
+      font-family: 'Quicksand', sans-serif !important;
     }
     body {
       overflow: hidden;
@@ -55,13 +64,21 @@ if (Platform.OS === 'web') {
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// App.js
+// Shared font style to use throughout the app
+export const FONT = {
+  regular: { fontFamily: 'Quicksand_400Regular' },
+  medium: { fontFamily: 'Quicksand_500Medium' },
+  semibold: { fontFamily: 'Quicksand_600SemiBold' },
+  bold: { fontFamily: 'Quicksand_700Bold' },
+};
+
 function HomeStack() {
   return (
     <Stack.Navigator
       screenOptions={{
         headerTintColor: '#858585',
-        headerBackTitleVisible: false, // <-- hides back button text
+        headerBackTitleVisible: false,
+        headerTitleStyle: { fontFamily: 'Quicksand_600SemiBold' },
       }}
     >
       <Stack.Screen
@@ -73,7 +90,7 @@ function HomeStack() {
       <Stack.Screen
         name="BookmarkDetail"
         component={BookmarkDetailScreen}
-        options={{ title: 'Bookmark Detail' }} // <-- change title here
+        options={{ title: 'Bookmark Detail' }}
       />
       <Stack.Screen
         name="FolderBookmarks"
@@ -92,7 +109,6 @@ function HomeStack() {
   );
 }
 
-// Create a root stack
 const RootStack = createNativeStackNavigator();
 
 function MainTabs() {
@@ -104,20 +120,16 @@ function MainTabs() {
         headerShown: false,
         tabBarIcon: ({ color, size }) => {
           let iconName;
-          if (route.name === 'Home') {
-            iconName = 'home-outline';
-          } else if (route.name === 'Folders') {
-            iconName = 'folder-outline';
-          } else if (route.name === 'Add') {
-            iconName = 'add-circle-outline';
-          } else if (route.name === 'Profile') {
-            iconName = 'person-outline';
-          }
+          if (route.name === 'Home') iconName = 'home-outline';
+          else if (route.name === 'Folders') iconName = 'folder-outline';
+          else if (route.name === 'Add') iconName = 'add-circle-outline';
+          else if (route.name === 'Profile') iconName = 'person-outline';
           return <Ionicons name={iconName} size={size} color={color} />;
         },
+        tabBarLabelStyle: { fontFamily: 'Quicksand_600SemiBold', fontSize: 11 },
         tabBarStyle: Platform.OS === 'web'
           ? {
-              backgroundColor: colors.bottomBar, // 👈 use theme bottomBar color
+              backgroundColor: colors.bottomBar,
               borderTopColor: colors.inputBorder,
               height: 56,
               paddingHorizontal: 0,
@@ -126,12 +138,9 @@ function MainTabs() {
               gap: 0,
             }
           : {
-              backgroundColor: colors.bottomBar, // 👈 use theme bottomBar color
+              backgroundColor: colors.bottomBar,
               borderTopColor: colors.inputBorder,
             },
-        tabBarItemStyle: Platform.OS === 'web'
-          ? {}
-          : {},
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.label,
       })}
@@ -139,17 +148,11 @@ function MainTabs() {
       <Tab.Screen
         name="Home"
         component={HomeStack}
-        options={{
-          unmountOnBlur: true,
-        }}
+        options={{ unmountOnBlur: true }}
         listeners={({ navigation }) => ({
           tabPress: e => {
-            // Prevent default behavior
             e.preventDefault();
-            // Reset the Home stack to the first screen
-            navigation.navigate('Home', {
-              screen: 'HomeMain',
-            });
+            navigation.navigate('Home', { screen: 'HomeMain' });
           },
         })}
       />
@@ -158,9 +161,7 @@ function MainTabs() {
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{
-          title: 'Profile',
-        }}
+        options={{ title: 'Profile' }}
       />
     </Tab.Navigator>
   );
@@ -189,21 +190,15 @@ function AppInner() {
 
   if (migrating) {
     return (
-      <View style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: colors.background
-      }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator size="large" color={colors.tag} />
-        <Text style={{ marginTop: 18, fontSize: 18, color: colors.tag }}>
+        <Text style={{ marginTop: 18, fontSize: 18, color: colors.tag, fontFamily: 'Quicksand_500Medium' }}>
           Migrating your bookmarks...
         </Text>
       </View>
     );
   }
 
-  // NavigationContainer lives at the app root; return the navigator directly here
   return <MainTabs />;
 }
 
@@ -216,21 +211,20 @@ function RootGate() {
   if (!isVerified) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <Text style={{ fontSize: 18, color: colors.tag, marginBottom: 18 }}>
+        <Text style={{ fontSize: 18, color: colors.tag, marginBottom: 18, fontFamily: 'Quicksand_600SemiBold' }}>
           Please verify your email address to continue.
         </Text>
-        <Text style={{ color: colors.label, textAlign: 'center', marginBottom: 18 }}>
+        <Text style={{ color: colors.label, textAlign: 'center', marginBottom: 18, fontFamily: 'Quicksand_400Regular' }}>
           Check your inbox for a verification link.
         </Text>
         <TouchableOpacity
           onPress={async () => {
-            // Optionally, resend verification email
             await supabase.auth.resend({ type: 'signup', email: user.email });
             Alert.alert('Verification email sent', 'Check your inbox.');
           }}
           style={{ backgroundColor: colors.tag, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
         >
-          <Text style={{ color: colors.card, fontSize: 16 }}>Resend Email</Text>
+          <Text style={{ color: colors.card, fontSize: 16, fontFamily: 'Quicksand_600SemiBold' }}>Resend Email</Text>
         </TouchableOpacity>
       </View>
     );
@@ -239,6 +233,16 @@ function RootGate() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Quicksand_400Regular,
+    Quicksand_500Medium,
+    Quicksand_600SemiBold,
+    Quicksand_700Bold,
+  });
+
+  // Wait for fonts before rendering anything
+  if (!fontsLoaded) return null;
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
@@ -256,15 +260,13 @@ export default function App() {
   );
 }
 
-// Debug: intercept attempts to open blob: URLs (logs stack + prevents native crash)
+// Debug: intercept attempts to open blob: URLs
 try {
   const _openURL = Linking.openURL;
   Linking.openURL = async (url) => {
     try {
       if (typeof url === 'string' && url.startsWith('blob:')) {
         console.log('DEBUG: Linking.openURL called with blob URI:', url);
-        console.trace();
-        // prevent native "No suitable URL request handler" error — adjust behavior as needed
         return Promise.reject(new Error('Blocked blob: URL'));
       }
     } catch (e) {
@@ -276,8 +278,6 @@ try {
   const _canOpen = Linking.canOpenURL;
   Linking.canOpenURL = async (url) => {
     if (typeof url === 'string' && url.startsWith('blob:')) {
-      console.log('DEBUG: Linking.canOpenURL called with blob URI:', url);
-      console.trace();
       return false;
     }
     return _canOpen(url);
@@ -286,12 +286,6 @@ try {
   console.warn('DEBUG: Linking monkeypatch failed', e);
 }
 
-// Removed the RN.Image replacement block because assigning to RN.Image throws:
-// TypeError: Cannot assign to property 'Image' which has only a getter
-// If you still want image-debugging, create a separate DebugImage component and use it
-// in places where you render <Image /> instead of attempting a global assignment.
-
-// 🔹 Styles for the custom header
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
@@ -299,7 +293,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: '#fff',
-    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
   },
   search: {
     flex: 1,
@@ -307,11 +300,10 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     marginRight: 10,
-    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
   },
   buttonText: {
     fontSize: 16,
     color: '#858585',
-    ...(Platform.OS === 'web' ? { fontFamily: 'sans-serif' } : {}),
+    fontFamily: 'Quicksand_400Regular',
   },
 });

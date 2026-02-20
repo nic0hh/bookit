@@ -3,8 +3,8 @@ import React, { useState, useContext, useLayoutEffect } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, Image, StyleSheet, ScrollView,
-  TouchableOpacity, Modal, FlatList, Alert, Platform, KeyboardAvoidingView,
-  Linking
+  TouchableOpacity, Modal, FlatList, Alert, Platform,
+  KeyboardAvoidingView, Linking
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
@@ -14,12 +14,75 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient';
 
 const STORAGE_BUCKET = 'bookmark-images';
+const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
 
+// ── Shared folder picker (same pattern as AddScreen) ─────────────────────────
+function MultiFolderPicker({ selectedIds, folders, onChange, colors }) {
+  const [visible, setVisible] = useState(false);
+
+  const toggleFolder = (id) =>
+    onChange(selectedIds.includes(id)
+      ? selectedIds.filter(x => x !== id)
+      : [...selectedIds, id]);
+
+  const label =
+    selectedIds.length === 0 ? 'None selected' :
+    selectedIds.length === 1 ? folders.find(f => f.id === selectedIds[0])?.name || '1 folder' :
+    `${selectedIds.length} folders selected`;
+
+  return (
+    <View>
+      <TouchableOpacity
+        style={[styles.pickerTrigger, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+        onPress={() => setVisible(true)}
+      >
+        <Text style={[styles.pickerTriggerText, { color: selectedIds.length ? colors.text : colors.label, fontFamily: 'Quicksand_400Regular' }]}>
+          {label}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color={colors.label} />
+      </TouchableOpacity>
+
+      <Modal visible={visible} transparent animationType="fade">
+        <TouchableOpacity style={styles.pickerOverlay} onPress={() => setVisible(false)} activeOpacity={1}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={[styles.pickerCard, { backgroundColor: colors.card }]}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Folders</Text>
+              <FlatList
+                data={folders}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => {
+                  const isSelected = selectedIds.includes(item.id);
+                  return (
+                    <TouchableOpacity
+                      style={[styles.pickerRow, { borderBottomColor: colors.inputBorder }]}
+                      onPress={() => toggleFolder(item.id)}
+                    >
+                      <View style={[styles.checkbox, { borderColor: colors.actionButton }, isSelected && { backgroundColor: colors.actionButton }]}>
+                        {isSelected && <Ionicons name="checkmark" size={14} color={colors.actionButtonText} />}
+                      </View>
+                      <Text style={[styles.pickerRowText, { color: colors.text }]}>{item.name}</Text>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+              <TouchableOpacity style={[styles.pickerDone, { backgroundColor: colors.actionButton }]} onPress={() => setVisible(false)}>
+                <Text style={[styles.pickerDoneText, { color: colors.actionButtonText }]}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
 export default function BookmarkDetailScreen({ navigation, route }) {
   const { updateBookmark, deleteBookmark, folders } = useContext(BookmarksContext);
-  const { colors, setThemeName } = useContext(ThemeContext);
+  const { colors } = useContext(ThemeContext);
+  const insets = useSafeAreaInsets();
 
-  const bookmark = route.params?.bookmark || {}; // adjust to your prop shape
+  const bookmark = route.params?.bookmark || {};
 
   const [title, setTitle] = useState(bookmark?.title || '');
   const [url, setUrl] = useState(bookmark?.url || '');
@@ -38,100 +101,42 @@ export default function BookmarkDetailScreen({ navigation, route }) {
   const [removing, setRemoving] = useState(false);
   const [refreshingMetadata, setRefreshingMetadata] = useState(false);
 
-  const insets = useSafeAreaInsets();
-
-  const refreshMetadata = async () => {
-    if (!url || url.trim().length === 0) {
-      Alert.alert('Error', 'Please enter a URL first');
-      return;
-    }
-
-    setRefreshingMetadata(true);
-    try {
-      console.log('Fetching metadata for:', url);
-      
-      // Use production Netlify function URL
-      const functionUrl = `https://bookitweb.netlify.app/.netlify/functions/fetch-metadata?url=${encodeURIComponent(url.trim())}`;
-      console.log('Calling function at:', functionUrl);
-      
-      const response = await fetch(functionUrl);
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('Metadata response:', data);
-      
-      if (data.error) {
-        Alert.alert('Error', data.error);
-        return;
-      }
-
-      // Update with new metadata
-      let updated = false;
-      if (data.title) {
-        setTitle(data.title);
-        updated = true;
-      }
-      if (data.image) {
-        setImageUri(data.image);
-        setImagePath(null);
-        updated = true;
-      }
-      
-      if (updated) {
-        Alert.alert('Success', 'Metadata refreshed! Click Save to update.');
-      } else {
-        Alert.alert('Info', 'No new metadata found for this URL.');
-      }
-    } catch (err) {
-      console.error('Refresh metadata error:', err);
-      Alert.alert('Error', 'Failed to fetch metadata: ' + err.message);
-    } finally {
-      setRefreshingMetadata(false);
-    }
-  };
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: 'Edit Bookmark',
+      headerTitleStyle: { fontFamily: 'Quicksand_600SemiBold', fontSize: 17, color: colors.text },
+      headerStyle: { backgroundColor: colors.background },
+      headerLeft: () => (
+        <TouchableOpacity style={{ paddingHorizontal: 16 }} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors]);
 
   const isRemoteUrl = (uri) => /^https?:\/\//i.test(uri);
 
   const uploadImageIfNeeded = async (uri) => {
     if (!uri || isRemoteUrl(uri)) return null;
-
     try {
       const response = await fetch(uri);
       const blob = await response.blob();
-
       const ext = (uri.split('.').pop() || 'jpg').split('?')[0].toLowerCase();
       const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'].includes(ext) ? ext : 'jpg';
       const contentType = safeExt === 'jpg' ? 'image/jpeg' : `image/${safeExt}`;
       const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
       const filePath = `uploads/${fileName}`;
-
-      const { error: uploadError } = await supabase
-        .storage
-        .from(STORAGE_BUCKET)
-        .upload(filePath, blob, { contentType, upsert: true });
-
-      if (uploadError) {
-        console.error('Image upload error:', uploadError);
-        Alert.alert('Upload failed', 'Could not upload the selected image.');
-        return null;
-      }
-
+      const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(filePath, blob, { contentType, upsert: true });
+      if (uploadError) { Alert.alert('Upload failed', 'Could not upload the selected image.'); return null; }
       return filePath;
     } catch (err) {
-      console.error('Image upload exception:', err);
       Alert.alert('Upload failed', 'Could not upload the selected image.');
       return null;
     }
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images
-    });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images });
     if (!result.canceled && result.assets?.length > 0) {
       const asset = result.assets[0];
       setImageUri(asset.uri);
@@ -139,47 +144,52 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       if (asset.width && asset.height) {
         setImageDimensions({ width: asset.width, height: asset.height });
       } else {
-        Image.getSize(
-          asset.uri,
-          (width, height) => setImageDimensions({ width, height }),
+        Image.getSize(asset.uri,
+          (w, h) => setImageDimensions({ width: w, height: h }),
           () => setImageDimensions({ width: null, height: null })
         );
       }
     }
   };
 
+  const refreshMetadata = async () => {
+    if (!url?.trim()) { Alert.alert('Error', 'Please enter a URL first'); return; }
+    setRefreshingMetadata(true);
+    try {
+      const response = await fetch(`${API_BASE}/fetch-metadata?url=${encodeURIComponent(url.trim())}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (data.error) { Alert.alert('Error', data.error); return; }
+      let updated = false;
+      if (data.title) { setTitle(data.title); updated = true; }
+      if (data.image) { setImageUri(data.image); setImagePath(null); updated = true; }
+      Alert.alert(updated ? 'Done' : 'No changes', updated ? 'Metadata refreshed. Save to apply.' : 'No new metadata found.');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to fetch metadata.');
+    } finally {
+      setRefreshingMetadata(false);
+    }
+  };
+
   const handleTagInput = (text) => {
     if (text.endsWith(' ')) {
       const newTag = text.trim();
-      if (newTag && !tags.includes(newTag)) {
-        setTags([...tags, newTag]);
-      }
+      if (newTag && !tags.includes(newTag)) setTags([...tags, newTag]);
       setTagInput('');
     } else {
       setTagInput(text);
     }
   };
 
-  const removeTag = (tagToRemove) => {
-    setTags(tags.filter(t => t !== tagToRemove));
-  };
+  const removeTag = (tag) => setTags(tags.filter(t => t !== tag));
 
-  const normalizeTags = (tags) =>
-    Array.from(new Set(tags.map(t => t.trim().toLowerCase()).filter(t => t && t.length <= 32)));
+  const normalizeTags = (input) =>
+    Array.from(new Set(input.map(t => t.trim().toLowerCase()).filter(t => t && t.length <= 32)));
 
   const onSave = async () => {
-    if (url.length > 2048) {
-      Alert.alert('Error', 'URL is too long.');
-      return;
-    }
-    if (title.length > 300) {
-      Alert.alert('Error', 'Title is too long (max 300 characters).');
-      return;
-    }
-    if (tags.length > 10) {
-      Alert.alert('Error', 'You can add up to 10 tags per bookmark.');
-      return;
-    }
+    if (url.length > 2048) { Alert.alert('Error', 'URL is too long.'); return; }
+    if (title.length > 300) { Alert.alert('Error', 'Title is too long.'); return; }
+    if (tags.length > 10) { Alert.alert('Error', 'Max 10 tags.'); return; }
 
     setSaving(true);
     const originalImage = imageUri || null;
@@ -188,10 +198,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
 
     if (originalImage && !isRemoteUrl(originalImage)) {
       const uploadResult = await uploadImageIfNeeded(originalImage);
-      if (!uploadResult) {
-        setSaving(false);
-        return;
-      }
+      if (!uploadResult) { setSaving(false); return; }
       imagePathToSave = uploadResult;
       imageUrlToSave = null;
     } else if (!imagePathToSave) {
@@ -199,582 +206,481 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       imagePathToSave = null;
     }
 
-    if (originalImage && !imageUrlToSave && !imagePathToSave) {
-      setSaving(false);
-      return;
-    }
+    if (originalImage && !imageUrlToSave && !imagePathToSave) { setSaving(false); return; }
 
     const err = await updateBookmark(bookmark.id, {
-      title: title.trim(),
-      url: url.trim(),
-      tags: normalizeTags(tags),
-      folderIds: selectedFolders,
-      image: imageUrlToSave,
-      imagePath: imagePathToSave,
+      title: title.trim(), url: url.trim(),
+      tags: normalizeTags(tags), folderIds: selectedFolders,
+      image: imageUrlToSave, imagePath: imagePathToSave,
       imageWidth: imageDimensions.width ?? bookmark?.image_width ?? null,
       imageHeight: imageDimensions.height ?? bookmark?.image_height ?? null,
     });
     setSaving(false);
-
     if (err) Alert.alert('Error', err);
     else navigation.goBack();
   };
 
   const confirmDelete = () => {
-    console.log('=== confirmDelete called ===');
-    console.log('Platform:', Platform.OS);
-    
-    // On web, Alert.alert doesn't work properly, so just confirm with window.confirm
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Are you sure you want to delete this bookmark?');
-      console.log('Web confirm result:', confirmed);
-      if (confirmed) {
+      if (window.confirm('Delete this bookmark?')) {
         (async () => {
           setRemoving(true);
-          console.log('Calling deleteBookmark for:', bookmark.id);
           const result = await deleteBookmark(bookmark.id);
-          console.log('Delete result:', result);
           setRemoving(false);
-          if (!result) {
-            navigation.goBack();
-          } else {
-            alert('Failed to delete bookmark: ' + (result.error || result));
-          }
+          if (!result) navigation.goBack();
+          else alert('Failed to delete: ' + (result.error || result));
         })();
       }
       return;
     }
-    
-    // Native Alert.alert for iOS/Android
     Alert.alert('Delete Bookmark', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setRemoving(true);
-          const result = await deleteBookmark(bookmark.id);
-          setRemoving(false);
-          if (!result) {
-            navigation.goBack();
-          } else {
-            Alert.alert('Error', 'Failed to delete bookmark: ' + (result.error || result));
-          }
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        setRemoving(true);
+        const result = await deleteBookmark(bookmark.id);
+        setRemoving(false);
+        if (!result) navigation.goBack();
+        else Alert.alert('Error', 'Failed to delete.');
+      }},
     ]);
   };
 
   const copyUrl = () => {
-    if (url) {
-      Clipboard.setStringAsync(url);
-      Alert.alert('Copied', 'URL copied to clipboard!');
-    }
+    if (url) { Clipboard.setStringAsync(url); Alert.alert('Copied', 'URL copied to clipboard!'); }
   };
 
   const openUrl = async () => {
-    if (!url) {
-      Alert.alert('No URL', 'This bookmark does not have a valid URL.');
-      return;
-    }
-
-    // Block blob: URLs on native — they are web-only
-    if (typeof url === 'string' && url.startsWith('blob:')) {
-      Alert.alert('Cannot open', 'This preview is only available on web.');
-      return;
-    }
-
+    if (!url) { Alert.alert('No URL', 'No URL on this bookmark.'); return; }
+    if (url.startsWith('blob:')) { Alert.alert('Cannot open', 'Preview only available on web.'); return; }
     try {
       const can = await Linking.canOpenURL(url);
-      if (can) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Cannot open', 'Cannot open this URL on your device.');
-      }
-    } catch (e) {
-      console.warn('openUrl error', e);
-      Alert.alert('Error', 'Failed to open URL.');
-    }
+      if (can) await Linking.openURL(url);
+      else Alert.alert('Cannot open', 'Cannot open this URL.');
+    } catch { Alert.alert('Error', 'Failed to open URL.'); }
   };
 
-  // 🔹 Multi-folder picker
-  const MultiFolderPicker = ({ selectedIds, folders, onChange }) => {
-    const [visible, setVisible] = useState(false);
+  // ── Shared form content ──
+  const FormContent = () => (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={styles.formContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Title */}
+      <Text style={[styles.fieldLabel, { color: colors.label }]}>Title</Text>
+      <TextInput
+        style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder, fontFamily: 'Quicksand_400Regular' }]}
+        value={title}
+        onChangeText={setTitle}
+        placeholder="Title"
+        placeholderTextColor={colors.label}
+      />
 
-    const toggleFolder = (folderId) => {
-      if (selectedIds.includes(folderId)) {
-        onChange(selectedIds.filter(id => id !== folderId));
-      } else {
-        onChange([...selectedIds, folderId]);
-      }
-    };
+      {/* URL */}
+      <Text style={[styles.fieldLabel, { color: colors.label }]}>URL</Text>
+      <TextInput
+        style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder, fontFamily: 'Quicksand_400Regular' }]}
+        value={url}
+        onChangeText={setUrl}
+        placeholder="https://example.com"
+        placeholderTextColor={colors.label}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
 
-    const selectedLabel = selectedIds.length === 0
-      ? 'None selected'
-      : selectedIds.length === 1
-      ? folders.find(f => f.id === selectedIds[0])?.name || '1 folder'
-      : `${selectedIds.length} folders`;
-
-    return (
-      <View>
+      {/* URL actions row */}
+      <View style={styles.actionRow}>
         <TouchableOpacity
-          style={{
-            borderWidth: 1,
-            borderColor: colors.inputBorder,
-            backgroundColor: colors.inputBackground,
-            borderRadius: 15,
-            padding: 12,
-          }}
-          onPress={() => setVisible(true)}
+          style={[styles.actionChip, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+          onPress={copyUrl}
         >
-          <Text style={{ color: colors.pickerText }}>{selectedLabel}</Text>
+          <Ionicons name="copy-outline" size={15} color={colors.label} />
+          <Text style={[styles.actionChipText, { color: colors.label }]}>Copy</Text>
         </TouchableOpacity>
-        <Modal visible={visible} transparent animationType="fade">
-          <TouchableOpacity
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.3)',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-            onPress={() => setVisible(false)}
-            activeOpacity={1}
-          >
-            <View
-              style={{
-                backgroundColor: colors.card,
-                borderRadius: 16,
-                padding: 16,
-                minWidth: 250,
-                maxHeight: 400,
-              }}
-              onStartShouldSetResponder={() => true}
-            >
-              <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>
-                Select Folders
-              </Text>
-              <FlatList
-                data={folders}
-                keyExtractor={item => item.id}
-                renderItem={({ item }) => {
-                  const isSelected = selectedIds.includes(item.id);
-                  return (
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingVertical: 12,
-                        paddingHorizontal: 8,
-                        borderBottomWidth: 1,
-                        borderBottomColor: colors.inputBorder,
-                      }}
-                      onPress={() => toggleFolder(item.id)}
-                    >
-                      <View
-                        style={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: 4,
-                          borderWidth: 2,
-                          borderColor: colors.actionButton,
-                          backgroundColor: isSelected ? colors.actionButton : 'transparent',
-                          marginRight: 12,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}
-                      >
-                        {isSelected && (
-                          <Text style={{ color: colors.card, fontSize: 16, fontWeight: 'bold' }}>✓</Text>
-                        )}
-                      </View>
-                      <Text style={{ color: colors.pickerText, fontSize: 17, flex: 1 }}>
-                        {item.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                }}
-              />
-              <TouchableOpacity
-                style={{
-                  marginTop: 12,
-                  padding: 12,
-                  backgroundColor: colors.actionButton,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                }}
-                onPress={() => setVisible(false)}
-              >
-                <Text style={{ color: colors.actionButtonText, fontSize: 16, fontWeight: 'bold' }}>
-                  Done
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Modal>
+        <TouchableOpacity
+          style={[styles.actionChip, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+          onPress={openUrl}
+        >
+          <Ionicons name="open-outline" size={15} color={colors.label} />
+          <Text style={[styles.actionChipText, { color: colors.label }]}>Open</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionChip, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, opacity: refreshingMetadata ? 0.5 : 1 }]}
+          onPress={refreshMetadata}
+          disabled={refreshingMetadata}
+        >
+          <Ionicons name="refresh-outline" size={15} color={colors.label} />
+          <Text style={[styles.actionChipText, { color: colors.label }]}>
+            {refreshingMetadata ? 'Refreshing…' : 'Refresh'}
+          </Text>
+        </TouchableOpacity>
       </View>
-    );
-  };
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: 'Edit Bookmark',
-      headerTitleStyle: {
-        color: colors.text, // 👈 theme color for title
-        fontSize: 18,
-      },
-      headerStyle: {
-        backgroundColor: colors.background, // optional: match theme background
-      },
-      headerLeft: () => (
-        <TouchableOpacity
-          style={{ paddingHorizontal: 16 }}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+      {/* Mobile-only image (web shows in left column) */}
+      {Platform.OS !== 'web' && imageUri && (
+        <TouchableOpacity onPress={pickImage} style={styles.mobileImageWrapper}>
+          <Image
+            source={{ uri: imageUri }}
+            style={styles.mobileImage}
+            resizeMode="cover"
+          />
+          <View style={styles.imageOverlay}>
+            <Ionicons name="camera-outline" size={18} color="#fff" />
+            <Text style={styles.imageOverlayText}>Change image</Text>
+          </View>
         </TouchableOpacity>
-      ),
-    });
-  }, [navigation, colors.text, colors.background]);
+      )}
+      {Platform.OS !== 'web' && !imageUri && (
+        <TouchableOpacity
+          style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+          onPress={pickImage}
+        >
+          <Ionicons name="image-outline" size={28} color={colors.label} />
+          <Text style={[styles.imagePlaceholderText, { color: colors.label }]}>Upload image</Text>
+        </TouchableOpacity>
+      )}
 
-  async function handleDelete() {
-    console.log('=== handleDelete called ===');
-    console.log('bookmark?.id:', bookmark?.id);
-    if (!bookmark?.id) {
-      console.log('❌ No bookmark ID, returning');
-      return;
-    }
-    
-    console.log('Calling deleteBookmark...');
-    const result = await deleteBookmark(bookmark.id);
-    console.log('deleteBookmark returned:', result);
-    console.log('Type of result:', typeof result);
-    console.log('Truthy?', !!result);
-    
-    if (result) {
-      console.warn('❌ deleteBookmark returned error', result);
-      try { Alert.alert('Delete failed', String(result.error || result)); } catch {}
-    } else {
-      console.log('✅ delete succeeded, navigating back');
-      navigation.goBack();
-    }
-  }
+      {/* Tags */}
+      <Text style={[styles.fieldLabel, { color: colors.label }]}>Tags</Text>
+      <View style={[styles.tagsContainer, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}>
+        {tags.map((tag, idx) => (
+          <View key={idx} style={[styles.tagBubble, { backgroundColor: colors.tag }]}>
+            <Text style={[styles.tagText, { color: colors.text, fontFamily: 'Quicksand_500Medium' }]}>{tag}</Text>
+            <TouchableOpacity onPress={() => removeTag(tag)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+              <Ionicons name="close" size={13} color={colors.label} style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
+          </View>
+        ))}
+        <TextInput
+          style={[styles.tagInput, { color: colors.text, fontFamily: 'Quicksand_400Regular' }]}
+          value={tagInput}
+          onChangeText={handleTagInput}
+          placeholder={tags.length === 0 ? 'Type a tag and press space…' : 'Add another…'}
+          placeholderTextColor={colors.label}
+          autoCapitalize="none"
+        />
+      </View>
+
+      {/* Folders */}
+      <Text style={[styles.fieldLabel, { color: colors.label }]}>Folders</Text>
+      <MultiFolderPicker
+        selectedIds={selectedFolders}
+        folders={folders}
+        onChange={setSelectedFolders}
+        colors={colors}
+      />
+
+      {/* Save */}
+      <TouchableOpacity
+        style={[styles.saveButton, { backgroundColor: colors.actionButton, opacity: saving ? 0.6 : 1 }]}
+        onPress={onSave}
+        disabled={saving}
+      >
+        <Ionicons name="checkmark-outline" size={18} color={colors.actionButtonText} style={{ marginRight: 8 }} />
+        <Text style={[styles.saveButtonText, { color: colors.actionButtonText }]}>
+          {saving ? 'Saving…' : 'Save Changes'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Delete */}
+      <TouchableOpacity
+        style={[styles.deleteButton, { opacity: removing ? 0.6 : 1 }]}
+        onPress={confirmDelete}
+        disabled={removing}
+      >
+        <Ionicons name="trash-outline" size={16} color="#d72660" style={{ marginRight: 6 }} />
+        <Text style={styles.deleteButtonText}>
+          {removing ? 'Deleting…' : 'Delete Bookmark'}
+        </Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      edges={['top', 'bottom']}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        <View
-          style={{
-            flex: 1,
-            borderTopWidth: Platform.OS === 'web' ? 0 : 1,      // remove top border on web
-            borderBottomWidth: Platform.OS === 'web' ? 0 : 1,   // remove bottom border on web
-            borderColor: Platform.OS === 'web' ? 'transparent' : colors.bookmarkBorder, // remove border color on web
-            backgroundColor: colors.card,
-            ...(Platform.OS === 'web'
-              ? {
-                  maxWidth: 420,
-                  maxHeight: 850,
-                  alignSelf: 'center',
-                  width: '100%',
-                  borderRadius: 24,
-                  overflow: 'hidden',
-                  marginTop: 40,
-                  marginBottom: 40,
-                }
-              : {}),
-          }}
-        >
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{
-              paddingHorizontal: 20,
-              paddingTop: insets.top,
-              paddingBottom: insets.bottom,
-            }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Title */}
-            <TextInput
-              style={[styles.input, {
-                backgroundColor: colors.inputBackground,
-                color: colors.text,
-                borderColor: colors.inputBorder,
-              }]}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Title"
-              placeholderTextColor={colors.label}
-            />
-
-            {/* URL */}
-            <TextInput
-              style={[styles.input, {
-                backgroundColor: colors.inputBackground,
-                color: colors.text,
-                borderColor: colors.inputBorder,
-              }]}
-              value={url}
-              onChangeText={setUrl}
-              placeholder="URL"
-              placeholderTextColor={colors.label}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity
-              style={[
-                styles.buttonGray,
-                {
-                  backgroundColor: colors.actionButton,
-                  borderWidth: 0.7,
-                  borderColor: colors.actionButtonText, // 👈 add border with actionButtonText color
-                }
-              ]}
-              onPress={copyUrl}
-            >
-              <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-                Copy URL
-              </Text>
-            </TouchableOpacity>
-
-            {/* Image with position adjustment */}
-            {imageUri ? (
-              <View style={{ marginVertical: 10 }}>
-                {Platform.OS === 'web' ? (
+        {Platform.OS === 'web' ? (
+          // Web: two-column layout matching AddScreen
+          <View style={styles.webLayout}>
+            {/* Left: image */}
+            <View style={styles.webLeft}>
+              {imageUri ? (
+                <TouchableOpacity onPress={pickImage} style={styles.webImageWrapper}>
                   <img
                     src={imageUri}
                     alt={title || 'Bookmark'}
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      maxHeight: '500px',
-                      objectFit: 'contain',
-                      borderRadius: '12px',
-                      border: `1px solid ${colors.inputBorder}`,
-                    }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 16 }}
                   />
-                ) : (
-                  <View 
-                    style={{ 
-                      width: '100%', 
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: colors.inputBorder,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <Image 
-                      source={{ uri: imageUri }} 
-                      style={{
-                        width: '100%',
-                        height: undefined,
-                        aspectRatio: bookmark?.image_width && bookmark?.image_height
-                          ? bookmark.image_width / bookmark.image_height
-                          : 1.5,
-                      }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                )}
-              </View>
-            ) : null}
-            
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              <TouchableOpacity
-                style={[
-                  styles.buttonGray,
-                  {
-                    flex: 1,
-                    backgroundColor: colors.actionButton,
-                    borderWidth: 0.7,
-                    borderColor: colors.actionButtonText,
-                  }
-                ]}
-                onPress={pickImage}
-              >
-                <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-                  Upload Image
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.buttonGray,
-                  {
-                    flex: 1,
-                    backgroundColor: colors.actionButton,
-                    borderWidth: 0.7,
-                    borderColor: colors.actionButtonText,
-                    opacity: refreshingMetadata ? 0.5 : 1,
-                  }
-                ]}
-                onPress={refreshMetadata}
-                disabled={refreshingMetadata}
-              >
-                <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-                  {refreshingMetadata ? 'Refreshing...' : 'Refresh Metadata'}
-                </Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.webImagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                  onPress={pickImage}
+                >
+                  <Ionicons name="image-outline" size={40} color={colors.label} />
+                  <Text style={[styles.imagePlaceholderText, { color: colors.label, marginTop: 10 }]}>Click to upload image</Text>
+                </TouchableOpacity>
+              )}
+              {imageUri && (
+                <TouchableOpacity
+                  style={[styles.changeImageBtn, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                  onPress={pickImage}
+                >
+                  <Ionicons name="camera-outline" size={16} color={colors.label} />
+                  <Text style={[styles.changeImageText, { color: colors.label }]}>Change image</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
-            {/* Tags */}
-            <Text style={[styles.label, { color: colors.label }]}>Tags (type and press space):</Text>
-            <View style={[styles.tagsRow, { flexWrap: 'wrap', alignItems: 'flex-start' }]}>
-              {tags.map((tag, idx) => (
-                <View key={idx} style={[styles.tagBubble, { backgroundColor: colors.tag }]}>
-                  <Text style={[styles.tagText, { color: colors.tagText }]}>{tag}</Text>
-                  <Text
-                    style={[styles.tagRemove, { color: colors.label }]}
-                    onPress={() => removeTag(tag)}
-                  >
-                    ×
-                  </Text>
-                </View>
-              ))}
-              <TextInput
-                style={[styles.tagInput, {
-                  backgroundColor: colors.inputBackground,
-                  color: colors.text,
-                  borderColor: colors.inputBorder,
-                }]}
-                value={tagInput}
-                onChangeText={handleTagInput}
-                placeholder="Add tag"
-                placeholderTextColor={colors.label}
-                autoCapitalize="none"
-              />
+            {/* Right: form */}
+            <View style={[styles.webRight, { backgroundColor: colors.card }]}>
+              <FormContent />
             </View>
-
-            {/* Folder */}
-            <Text style={[styles.label, { color: colors.label }]}>Select Folders:</Text>
-            <MultiFolderPicker
-              selectedIds={selectedFolders}
-              folders={folders}
-              onChange={setSelectedFolders}
-            />
-
-            {/* Save + Delete */}
-            <TouchableOpacity
-              style={[
-                styles.buttonGray,
-                {
-                  backgroundColor: colors.actionButton,
-                  borderWidth: 0.7,
-                  borderColor: colors.actionButtonText,
-                  marginTop: 12,
-                  marginBottom: 8,
-                }
-              ]}
-              onPress={onSave}
-              disabled={saving}
-            >
-              <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Go to Site button */}
-            <TouchableOpacity
-              style={[
-                styles.buttonGray,
-                {
-                  backgroundColor: colors.actionButton,         // match Save Changes button
-                  borderWidth: 0.7,
-                  borderColor: colors.actionButtonText,         // match Save Changes button
-                  marginBottom: 8,
-                }
-              ]}
-              onPress={openUrl}
-            >
-              <Text style={[styles.buttonText, { color: colors.actionButtonText }]}>
-                Go to Site
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.buttonGray,
-                { backgroundColor: '#f31919ff', marginTop: 5 }
-              ]}
-              onPress={confirmDelete}
-              disabled={removing}
-            >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>
-                {removing ? 'Deleting...' : 'Delete Bookmark'}
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+          </View>
+        ) : (
+          // Mobile: single column
+          <View style={[styles.mobileForm, { backgroundColor: colors.card }]}>
+            <FormContent />
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  // ── Web layout ──
+  webLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    padding: 24,
+    gap: 24,
+  },
+  webLeft: {
+    flex: 1,
+    maxWidth: 480,
+  },
+  webImageWrapper: {
+    flex: 1,
+    minHeight: 300,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  webImagePlaceholder: {
+    flex: 1,
+    minHeight: 300,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  changeImageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  changeImageText: {
+    fontSize: 13,
+    fontFamily: 'Quicksand_500Medium',
+  },
+  webRight: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+
+  // ── Mobile layout ──
+  mobileForm: {
+    flex: 1,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+
+  // ── Form ──
+  formContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontFamily: 'Quicksand_600SemiBold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 16,
+  },
   input: {
     borderWidth: 1,
-    borderRadius: 15,
-    padding: 12,
-    marginVertical: 6,
-    fontSize: 16,
-  },
-  label: {
-    fontSize: 15,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  image: {
-    width: '100%',
-    marginVertical: 10,
-    resizeMode: 'contain',
     borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
   },
-  tagsRow: {
+
+  // URL action chips
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  actionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  actionChipText: {
+    fontSize: 13,
+    fontFamily: 'Quicksand_500Medium',
+  },
+
+  // Mobile image
+  mobileImageWrapper: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    height: 180,
+    marginTop: 8,
+  },
+  mobileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 6,
+  },
+  imageOverlayText: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: 'Quicksand_500Medium',
+  },
+  imagePlaceholder: {
+    height: 120,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  imagePlaceholderText: {
+    fontSize: 13,
+    fontFamily: 'Quicksand_400Regular',
+  },
+
+  // Tags
+  tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    alignContent: 'flex-start',
-    marginVertical: 6,
-    rowGap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 8,
+    gap: 6,
+    minHeight: 46,
   },
   tagBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    height: 32,
-    marginRight: 6,
-  },
-  tagText: {
-    fontSize: 15,
-  },
-  tagRemove: {
-    marginLeft: 6,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  tagInput: {
-    borderWidth: 1,
-    borderRadius: 15,
+    borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    height: 32,
-    minWidth: 80,
-    fontSize: 15,
   },
-  buttonGray: {
-    borderRadius: 15,
-    paddingVertical: 12,
+  tagText: { fontSize: 13 },
+  tagInput: {
+    fontSize: 14,
+    minWidth: 100,
+    paddingVertical: 2,
+    flex: 1,
+  },
+
+  // Buttons
+  saveButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 6,
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 15,
+    marginTop: 24,
   },
-  buttonText: {
+  saveButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Quicksand_600SemiBold',
   },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    fontFamily: 'Quicksand_500Medium',
+    color: '#d72660',
+  },
+
+  // Folder picker
+  pickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  pickerTriggerText: { fontSize: 14, flex: 1 },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickerCard: {
+    borderRadius: 16,
+    padding: 20,
+    width: 300,
+    maxHeight: 420,
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontFamily: 'Quicksand_700Bold',
+    marginBottom: 14,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  pickerRowText: { fontSize: 15, fontFamily: 'Quicksand_400Regular', flex: 1 },
+  checkbox: {
+    width: 22, height: 22,
+    borderRadius: 6, borderWidth: 2,
+    marginRight: 12,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  pickerDone: { marginTop: 14, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  pickerDoneText: { fontSize: 15, fontFamily: 'Quicksand_600SemiBold' },
 });

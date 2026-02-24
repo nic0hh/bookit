@@ -8,11 +8,8 @@ const STORAGE_BUCKET = 'bookmark-images';
 
 export function BookmarksProvider({ children }) {
   const profilesContext = useContext(ProfilesContext);
-  console.log('📦 BookmarksProvider - ProfilesContext value:', profilesContext);
   
   const { effectiveProfileId, isViewingShared } = profilesContext || {};
-  console.log('📦 BookmarksProvider - effectiveProfileId:', effectiveProfileId);
-  console.log('📦 BookmarksProvider - isViewingShared:', isViewingShared);
 
   const [bookmarks, setBookmarks] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -57,7 +54,6 @@ export function BookmarksProvider({ children }) {
         .order('name', { ascending: true });
 
       if (error) {
-        console.error('loadFolders error:', error);
         setFolders([]);
         return [];
       }
@@ -65,7 +61,6 @@ export function BookmarksProvider({ children }) {
       setFolders(data || []);
       return data || [];
     } catch (err) {
-      console.error('loadFolders exception:', err);
       setFolders([]);
       return [];
     }
@@ -77,8 +72,6 @@ export function BookmarksProvider({ children }) {
   async function loadBookmarks() {
     if (!effectiveProfileId) return [];
 
-    console.log("DEBUG loadBookmarks -> effectiveProfileId =", effectiveProfileId);
-
     setLoading(true);
     try {
       // Fetch bookmarks
@@ -89,7 +82,6 @@ export function BookmarksProvider({ children }) {
         .order("created_at", { ascending: false });
 
       if (bookmarksError) {
-        console.error("loadBookmarks error:", bookmarksError);
         setBookmarks([]);
         return [];
       }
@@ -98,10 +90,6 @@ export function BookmarksProvider({ children }) {
       const { data: junctionData, error: junctionError } = await supabase
         .from("bookmark_folders")
         .select("bookmark_id, folder_id");
-
-      if (junctionError) {
-        console.error("loadBookmarks junction error:", junctionError);
-      }
 
       // Map folder IDs to each bookmark
       const bookmarksWithFolders = await Promise.all(
@@ -117,9 +105,7 @@ export function BookmarksProvider({ children }) {
               .from(STORAGE_BUCKET)
               .createSignedUrl(bookmark.image_path, 60 * 60);
 
-            if (signedError) {
-              console.error('createSignedUrl error:', signedError);
-            } else {
+            if (!signedError) {
               signedImageUrl = signedData?.signedUrl || signedImageUrl;
             }
           }
@@ -134,19 +120,9 @@ export function BookmarksProvider({ children }) {
         })
       );
 
-      console.log("DEBUG bookmarks count:", bookmarksWithFolders.length);
-      if (bookmarksWithFolders[0]) {
-        console.log("DEBUG first bookmark:", JSON.stringify(bookmarksWithFolders[0], null, 2));
-        console.log("DEBUG image dimensions:", {
-          width: bookmarksWithFolders[0].image_width,
-          height: bookmarksWithFolders[0].image_height
-        });
-      }
-
       setBookmarks(bookmarksWithFolders);
       return bookmarksWithFolders;
     } catch (err) {
-      console.error("loadBookmarks exception:", err);
       setBookmarks([]);
       return [];
     } finally {
@@ -184,7 +160,6 @@ export function BookmarksProvider({ children }) {
       .single();
 
     if (error) {
-      console.error("addBookmark error:", error);
       return { error };
     }
 
@@ -198,10 +173,6 @@ export function BookmarksProvider({ children }) {
       const { error: junctionError } = await supabase
         .from("bookmark_folders")
         .insert(junctionInserts);
-
-      if (junctionError) {
-        console.error("addBookmark junction error:", junctionError);
-      }
     }
 
     await reloadAll();
@@ -212,36 +183,24 @@ export function BookmarksProvider({ children }) {
   // Delete bookmark (blocked for shared viewers)
   // ---------------------------------------------------------------
   async function deleteBookmark(id) {
-    console.log('=== deleteBookmark called with id:', id);
-    console.log('effectiveProfileId:', effectiveProfileId);
-    console.log('isViewingShared:', isViewingShared);
     
     if (isViewingShared) {
-      console.log('❌ Blocked: viewing shared profile');
       return { error: "Cannot delete bookmarks from a shared profile" };
     }
 
     if (!effectiveProfileId) {
-      console.log('❌ No effectiveProfileId - cannot delete');
       return { error: "No profile ID available" };
     }
 
-    console.log('Calling Supabase delete...');
     const { error } = await supabase
       .from("bookmarks")
       .delete()
       .eq("id", id);
-
-    console.log('Supabase response - error:', error);
-
     if (error) {
-      console.error("❌ deleteBookmark error:", error);
       return { error };
     }
 
-    console.log('✅ Delete successful, calling reloadAll...');
     await reloadAll();
-    console.log('Returning null (success)');
     return null;
   }
 
@@ -272,7 +231,6 @@ export function BookmarksProvider({ children }) {
       .eq("id", id);
 
     if (error) {
-      console.error("updateBookmark error:", error);
       return error.message || "Update failed";
     }
 
@@ -294,10 +252,6 @@ export function BookmarksProvider({ children }) {
         const { error: junctionError } = await supabase
           .from("bookmark_folders")
           .insert(junctionInserts);
-
-        if (junctionError) {
-          console.error("updateBookmark junction error:", junctionError);
-        }
       }
     }
 
@@ -321,7 +275,6 @@ export function BookmarksProvider({ children }) {
       });
 
     if (error) {
-      console.error("addFolder error:", error);
       return error.message || "Add folder failed";
     }
 
@@ -342,7 +295,6 @@ export function BookmarksProvider({ children }) {
       .eq("id", id);
 
     if (error) {
-      console.error("editFolder error:", error);
       return error.message || "Edit folder failed";
     }
 
@@ -363,7 +315,6 @@ export function BookmarksProvider({ children }) {
       .eq("id", id);
 
     if (error) {
-      console.error("removeFolder error:", error);
       return error.message || "Remove folder failed";
     }
 
@@ -409,7 +360,6 @@ export function BookmarksProvider({ children }) {
       .eq("id", id);
 
     if (error) {
-      console.error("setFolderHidden error:", error);
       return error.message || "Update folder visibility failed";
     }
 

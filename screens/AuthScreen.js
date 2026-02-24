@@ -12,7 +12,6 @@ function isPasswordValid(pw) {
 export default function AuthScreen(props) {
   const { signIn, signUp } = useContext(AuthContext);
   const { colors } = useContext(ThemeContext);
-  console.log('AuthScreen theme colors:', colors); // debug — remove later
   const [mode, setMode] = useState('signin'); // 'signin', 'signup', 'reset'
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
@@ -104,7 +103,11 @@ export default function AuthScreen(props) {
         </>
       )}
       {err ? <Text style={{ color: '#d72660', marginBottom: 10 }}>{err}</Text> : null}
-      {info ? <Text style={{ color: colors.label, marginBottom: 10 }}>{info}</Text> : null}
+      {info ? (
+  <Text style={{ color: '#34c759', marginBottom: 10, fontFamily: 'Quicksand_500Medium', fontSize: 14 }}>
+    {info}
+  </Text>
+) : null}
       <TouchableOpacity
         onPress={submit}
         style={{

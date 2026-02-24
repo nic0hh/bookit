@@ -248,26 +248,35 @@ export default function AddScreen({ navigation }) {
 
   const isRemoteUrl = (uri) => /^https?:\/\//i.test(uri);
 
-  const uploadImageIfNeeded = async (uri) => {
-    if (!uri) return { imageUrl: null, imagePath: null };
-    if (isRemoteUrl(uri)) return { imageUrl: uri, imagePath: null };
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const ext = (uri.split('.').pop() || 'jpg').split('?')[0].toLowerCase();
-      const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'].includes(ext) ? ext : 'jpg';
-      const contentType = safeExt === 'jpg' ? 'image/jpeg' : `image/${safeExt}`;
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
-      const filePath = `uploads/${fileName}`;
-      const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(filePath, blob, { contentType, upsert: true });
-      if (uploadError) { Alert.alert('Upload failed', 'Could not upload the selected image.'); return null; }
-      return { imageUrl: null, imagePath: filePath };
-    } catch (err) {
-      Alert.alert('Upload failed', 'Could not upload the selected image.');
-      return null;
-    }
-  };
+const uploadImageIfNeeded = async (uri) => {
+  if (!uri) return { imageUrl: null, imagePath: null };
 
+  try {
+    const response = await fetch(uri);
+    if (!response.ok) throw new Error('Failed to fetch image');
+    const blob = await response.blob();
+
+    const contentType = blob.type || 'image/jpeg';
+    const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
+    const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
+    const filePath = `uploads/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(filePath, blob, { contentType, upsert: true });
+
+    if (uploadError) {
+      // Fall back to storing the URL directly if upload fails
+      return { imageUrl: uri, imagePath: null };
+    }
+
+    return { imageUrl: null, imagePath: filePath };
+  } catch (err) {
+    // Fall back to URL if we can't fetch/upload
+    return { imageUrl: uri, imagePath: null };
+  }
+};
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images });
     if (!result.cancelled && result.assets?.length > 0) {
@@ -414,7 +423,7 @@ export default function AddScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        {Platform.OS === 'web' ? (
+        {Platform.OS === 'web' && windowWidth >= 700 ? (
           // Web: two-column layout
           <View style={styles.webLayout}>
             {/* Left: image preview */}

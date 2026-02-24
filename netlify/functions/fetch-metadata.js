@@ -15,7 +15,6 @@ exports.handler = async function(event) {
     };
   }
 
-  console.log('fetch-metadata invoked', event.queryStringParameters);
   const url = (event.queryStringParameters && event.queryStringParameters.url) || '';
   if (!url || !/^https?:\/\//i.test(url)) {
     return {
@@ -72,9 +71,7 @@ exports.handler = async function(event) {
           imageWidth = parseInt(ogWidth);
           imageHeight = parseInt(ogHeight);
         }
-      } catch (err) {
-        console.log('Could not fetch image dimensions:', err.message);
-      }
+      } catch (err) {}
     }
 
     return {
@@ -83,7 +80,6 @@ exports.handler = async function(event) {
       headers: corsHeaders
     };
   } catch (e) {
-    console.error('fetch-metadata error', e);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Failed to fetch metadata' }),

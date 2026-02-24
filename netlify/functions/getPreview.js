@@ -62,9 +62,7 @@ exports.handler = async function (event, context) {
           // handle relative like "images/thumb.png"
           image = base.origin + "/" + image.replace(/^\/+/, "");
         }
-      } catch (e) {
-        console.warn("Failed to resolve image URL:", e.message);
-      }
+      } catch (e) {}
     }
 
     // --- Special handling for OpenLibrary ---
@@ -173,7 +171,6 @@ exports.handler = async function (event, context) {
       headers: corsHeaders
     };
   } catch (err) {
-    console.error("Preview error:", err.message);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: "Failed to fetch preview" }),

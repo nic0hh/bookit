@@ -42,8 +42,7 @@ export function ProfilesProvider({ children }) {
           .select('*')
           .eq('id', user.id)
           .single();
-        
-        if (profileErr) console.warn('load profile error:', profileErr);
+
         setProfile(myProfile || null);
 
         // Load profiles that shared *with me* (accepted only)
@@ -54,9 +53,7 @@ export function ProfilesProvider({ children }) {
 
         // Load profiles I've shared *with others*
         await loadSharedPermissions();
-      } catch (err) {
-        console.error('ProfilesContext useEffect error:', err);
-      }
+      } catch (err) {}
 
       setLoading(false);
     })();
@@ -89,7 +86,6 @@ export function ProfilesProvider({ children }) {
         .eq('status', 'accepted');
 
       if (error) {
-        console.error('loadSharedProfiles error', error);
         setSharedProfiles([]);
         return [];
       }
@@ -107,7 +103,6 @@ export function ProfilesProvider({ children }) {
       setSharedProfiles(normalized);
       return normalized;
     } catch (err) {
-      console.error('loadSharedProfiles exception', err);
       setSharedProfiles([]);
       return [];
     }
@@ -140,7 +135,6 @@ export function ProfilesProvider({ children }) {
         .eq('status', 'pending');
 
       if (error) {
-        console.error('loadPendingRequests error', error);
         setPendingRequests([]);
         return [];
       }
@@ -158,7 +152,6 @@ export function ProfilesProvider({ children }) {
       setPendingRequests(normalized);
       return normalized;
     } catch (err) {
-      console.error('loadPendingRequests exception', err);
       setPendingRequests([]);
       return [];
     }
@@ -177,7 +170,6 @@ export function ProfilesProvider({ children }) {
       });
 
       if (error) {
-        console.error('acceptShareRequest error', error);
         return { error };
       }
 
@@ -191,7 +183,6 @@ export function ProfilesProvider({ children }) {
 
       return { data };
     } catch (err) {
-      console.error('acceptShareRequest exception', err);
       return { error: err.message || String(err) };
     }
   }
@@ -209,7 +200,6 @@ export function ProfilesProvider({ children }) {
       });
 
       if (error) {
-        console.error('denyShareRequest error', error);
         return { error };
       }
 
@@ -222,7 +212,6 @@ export function ProfilesProvider({ children }) {
 
       return { data };
     } catch (err) {
-      console.error('denyShareRequest exception', err);
       return { error: err.message || String(err) };
     }
   }
@@ -249,7 +238,6 @@ export function ProfilesProvider({ children }) {
         .eq('owner_id', user.id);
 
       if (error) {
-        console.error('loadSharedPermissions error', error);
         setSharedPermissions([]);
         return [];
       }
@@ -265,11 +253,9 @@ export function ProfilesProvider({ children }) {
         created_at: r.created_at,
       }));
 
-      console.log('loadSharedPermissions normalized data:', normalized);
       setSharedPermissions(normalized);
       return normalized;
     } catch (err) {
-      console.error('loadSharedPermissions exception', err);
       setSharedPermissions([]);
       return [];
     }
@@ -289,22 +275,17 @@ export function ProfilesProvider({ children }) {
     if (!user) return { error: 'Not signed in' };
 
     try {
-      console.log('updateSharedFolders called with:', { permissionId, folderIds });
-      
+
       const { data, error } = await supabase.rpc('update_shared_folders', {
         permission_id: permissionId,
         new_folder_ids: folderIds,
       });
 
-      console.log('updateSharedFolders response:', { data, error });
-
       if (error) {
-        console.error('updateSharedFolders error', error);
         return { error };
       }
 
       if (data?.error) {
-        console.error('updateSharedFolders data.error', data.error);
         return { error: data.error };
       }
 
@@ -313,7 +294,6 @@ export function ProfilesProvider({ children }) {
 
       return { data };
     } catch (err) {
-      console.error('updateSharedFolders exception', err);
       return { error: err.message || String(err) };
     }
   }

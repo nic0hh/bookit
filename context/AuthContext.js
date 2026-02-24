@@ -14,9 +14,7 @@ export function AuthProvider({ children }) {
         const { data } = await supabase.auth.getSession();
         const sessionUser = data?.session?.user ?? null;
         if (sessionUser) setUser(sessionUser);
-      } catch (e) {
-        console.log('AuthContext rehydrate error', e);
-      }
+      } catch (e) {}
 
       // subscribe to changes so AuthContext and supabase client stay in sync
       try {
@@ -26,7 +24,6 @@ export function AuthProvider({ children }) {
         });
         sub = resp?.data?.subscription;
       } catch (e) {
-        console.log('AuthContext subscribe error', e);
         setInitializing(false);
       }
 

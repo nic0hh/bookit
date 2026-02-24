@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text, ActivityIndicator, Platform, Alert, Linking } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, ActivityIndicator, Platform, Alert, Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './context/AuthContext';
 import { BookmarksProvider } from './context/BookmarksContext';
@@ -30,7 +30,6 @@ import AuthScreen from './screens/AuthScreen';
 import { supabase } from './supabaseClient';
 import { AuthContext } from './context/AuthContext';
 
-// Prevent zoom on mobile web browsers
 if (Platform.OS === 'web') {
   const style = document.createElement('style');
   style.textContent = `
@@ -64,7 +63,6 @@ if (Platform.OS === 'web') {
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Shared font style to use throughout the app
 export const FONT = {
   regular: { fontFamily: 'Quicksand_400Regular' },
   medium: { fontFamily: 'Quicksand_500Medium' },
@@ -81,22 +79,14 @@ function HomeStack() {
         headerTitleStyle: { fontFamily: 'Quicksand_600SemiBold' },
       }}
     >
-      <Stack.Screen
-        name="HomeMain"
-        component={HomeScreen}
-        options={{ headerShown: false, title: 'Home' }}
-      />
+      <Stack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Add" component={AddScreen} options={{ title: 'Add Bookmark' }} />
-      <Stack.Screen
-        name="BookmarkDetail"
-        component={BookmarkDetailScreen}
-        options={{ title: 'Bookmark Detail' }}
-      />
+      <Stack.Screen name="BookmarkDetail" component={BookmarkDetailScreen} options={{ title: 'Edit Bookmark' }} />
       <Stack.Screen
         name="FolderBookmarks"
         component={FolderBookmarksScreen}
         options={({ route, navigation }) => ({
-          title: route.params?.folderName || 'Folder Bookmarks',
+          title: route.params?.folderName || 'Folder',
           headerShown: true,
           headerLeft: () => (
             <TouchableOpacity onPress={() => navigation.navigate('Folders')} style={{ marginLeft: 10 }}>
@@ -109,8 +99,6 @@ function HomeStack() {
   );
 }
 
-const RootStack = createNativeStackNavigator();
-
 function MainTabs() {
   const { colors } = useContext(ThemeContext);
 
@@ -118,37 +106,64 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarIcon: ({ color, size }) => {
-          let iconName;
-          if (route.name === 'Home') iconName = 'home-outline';
-          else if (route.name === 'Folders') iconName = 'folder-outline';
-          else if (route.name === 'Add') iconName = 'add-circle-outline';
-          else if (route.name === 'Profile') iconName = 'person-outline';
-          return <Ionicons name={iconName} size={size} color={color} />;
+
+        // ── Tab bar container ──
+        tabBarStyle: {
+          backgroundColor: colors.bottomBar,
+          borderTopColor: colors.inputBorder,
+          borderTopWidth: 0.5,
+          height: Platform.OS === 'ios' ? 80 : 62,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+          paddingTop: 8,
+          ...(Platform.OS === 'web' ? { height: 60, paddingBottom: 6, paddingTop: 6 } : {}),
         },
-        tabBarLabelStyle: { fontFamily: 'Quicksand_600SemiBold', fontSize: 11 },
-        tabBarStyle: Platform.OS === 'web'
-          ? {
-              backgroundColor: colors.bottomBar,
-              borderTopColor: colors.inputBorder,
-              height: 56,
-              paddingHorizontal: 0,
-              justifyContent: 'center',
-              display: 'flex',
-              gap: 0,
-            }
-          : {
-              backgroundColor: colors.bottomBar,
-              borderTopColor: colors.inputBorder,
-            },
+
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.label,
+
+        tabBarLabelStyle: {
+          fontFamily: 'Quicksand_600SemiBold',
+          fontSize: 10,
+          marginTop: 2,
+        },
+
+        // ── Per-tab icon ──
+        tabBarIcon: ({ focused, color }) => {
+          const icons = {
+            Home:    focused ? 'home'           : 'home-outline',
+            Folders: focused ? 'folder'         : 'folder-outline',
+            Add:     focused ? 'add-circle'     : 'add-circle-outline',
+            Profile: focused ? 'person'         : 'person-outline',
+          };
+          const name = icons[route.name] || 'ellipse-outline';
+
+          if (route.name === 'Add') {
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Ionicons name={name} size={28} color={color} />
+      {focused && (
+        <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />
+      )}
+    </View>
+  );
+}
+
+          // Active tab gets a small indicator dot
+          return (
+            <View style={{ alignItems: 'center' }}>
+              <Ionicons name={name} size={22} color={color} />
+              {focused && (
+                <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />
+              )}
+            </View>
+          );
+        },
       })}
     >
       <Tab.Screen
         name="Home"
         component={HomeStack}
-        options={{ unmountOnBlur: true }}
+        options={{ title: 'Home', unmountOnBlur: true }}
         listeners={({ navigation }) => ({
           tabPress: e => {
             e.preventDefault();
@@ -156,8 +171,16 @@ function MainTabs() {
           },
         })}
       />
-      <Tab.Screen name="Add" component={AddScreen} />
-      <Tab.Screen name="Folders" component={FoldersScreen} />
+      <Tab.Screen
+        name="Folders"
+        component={FoldersScreen}
+        options={{ title: 'Folders' }}
+      />
+      <Tab.Screen
+        name="Add"
+        component={AddScreen}
+        options={{ title: '' }}
+      />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
@@ -168,23 +191,7 @@ function MainTabs() {
 }
 
 function AppInner() {
-  const { colors, themeName } = useContext(ThemeContext);
-
-  const navTheme = React.useMemo(() => {
-    const base = themeName === 'dark' ? DarkTheme : DefaultTheme;
-    return {
-      ...base,
-      colors: {
-        ...base.colors,
-        background: colors.background,
-        card: colors.card,
-        text: colors.text,
-        border: colors.inputBorder,
-        primary: colors.text,
-        notification: colors.tag,
-      },
-    };
-  }, [colors, themeName]);
+  const { colors } = useContext(ThemeContext);
 
   const { migrating } = useContext(BookmarksContext);
 
@@ -212,7 +219,7 @@ function RootGate() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
         <Text style={{ fontSize: 18, color: colors.tag, marginBottom: 18, fontFamily: 'Quicksand_600SemiBold' }}>
-          Please verify your email address to continue.
+          Please verify your email to continue.
         </Text>
         <Text style={{ color: colors.label, textAlign: 'center', marginBottom: 18, fontFamily: 'Quicksand_400Regular' }}>
           Check your inbox for a verification link.
@@ -220,7 +227,7 @@ function RootGate() {
         <TouchableOpacity
           onPress={async () => {
             await supabase.auth.resend({ type: 'signup', email: user.email });
-            Alert.alert('Verification email sent', 'Check your inbox.');
+            Alert.alert('Sent', 'Check your inbox.');
           }}
           style={{ backgroundColor: colors.tag, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
         >
@@ -232,6 +239,32 @@ function RootGate() {
   return <AppInner />;
 }
 
+function AppNavigationRoot() {
+  const { colors, themeName } = useContext(ThemeContext);
+
+  const navTheme = React.useMemo(() => {
+    const base = themeName === 'dark' ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        background: colors.background,
+        card: colors.card,
+        text: colors.text,
+        border: colors.inputBorder,
+        primary: colors.text,
+        notification: colors.tag,
+      },
+    };
+  }, [colors, themeName]);
+
+  return (
+    <NavigationContainer theme={navTheme}>
+      <RootGate />
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts({
     Quicksand_400Regular,
@@ -240,7 +273,6 @@ export default function App() {
     Quicksand_700Bold,
   });
 
-  // Wait for fonts before rendering anything
   if (!fontsLoaded) return null;
 
   return (
@@ -249,9 +281,7 @@ export default function App() {
         <AuthProvider>
           <ProfilesProvider>
             <BookmarksProvider>
-              <NavigationContainer>
-                <RootGate />
-              </NavigationContainer>
+              <AppNavigationRoot />
             </BookmarksProvider>
           </ProfilesProvider>
         </AuthProvider>
@@ -260,50 +290,35 @@ export default function App() {
   );
 }
 
-// Debug: intercept attempts to open blob: URLs
+const tabStyles = StyleSheet.create({
+  addPill: {
+    width: 44,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 3,
+  },
+});
+
+// Blob URL safety patch
 try {
   const _openURL = Linking.openURL;
   Linking.openURL = async (url) => {
-    try {
-      if (typeof url === 'string' && url.startsWith('blob:')) {
-        console.log('DEBUG: Linking.openURL called with blob URI:', url);
-        return Promise.reject(new Error('Blocked blob: URL'));
-      }
-    } catch (e) {
-      console.warn('DEBUG Linking.openURL wrapper error', e);
-    }
+    if (typeof url === 'string' && url.startsWith('blob:')) return Promise.reject(new Error('Blocked blob: URL'));
     return _openURL(url);
   };
-
   const _canOpen = Linking.canOpenURL;
   Linking.canOpenURL = async (url) => {
-    if (typeof url === 'string' && url.startsWith('blob:')) {
-      return false;
-    }
+    if (typeof url === 'string' && url.startsWith('blob:')) return false;
     return _canOpen(url);
   };
 } catch (e) {
-  console.warn('DEBUG: Linking monkeypatch failed', e);
 }
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-  },
-  search: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 10,
-  },
-  buttonText: {
-    fontSize: 16,
-    color: '#858585',
-    fontFamily: 'Quicksand_400Regular',
-  },
-});

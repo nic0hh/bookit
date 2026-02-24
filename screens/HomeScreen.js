@@ -52,16 +52,32 @@ export default function HomeScreen({ navigation }) {
     }
   }, []);
 
-  useEffect(() => {
-    if (bookmarks.length > 0) {
-      const shuffled = shuffleArray(bookmarks);
-      setShuffledLocal(shuffled);
-      setFilteredBookmarks(shuffled);
-    } else {
-      setShuffledLocal([]);
-      setFilteredBookmarks([]);
+const hasShuffled = useRef(false);
+
+useEffect(() => {
+  if (bookmarks.length === 0) {
+    hasShuffled.current = false;
+    setShuffledLocal([]);
+    setFilteredBookmarks([]);
+    return;
+  }
+
+  if (!hasShuffled.current) {
+    // First load — shuffle everything
+    const shuffled = shuffleArray(bookmarks);
+    setShuffledLocal(shuffled);
+    setFilteredBookmarks(shuffled);
+    hasShuffled.current = true;
+  } else {
+    // Subsequent updates — just prepend any new bookmarks to the front
+    const existingIds = new Set(shuffledLocal.map(b => b.id));
+    const newOnes = bookmarks.filter(b => !existingIds.has(b.id));
+    if (newOnes.length > 0) {
+      setShuffledLocal(prev => [...newOnes, ...prev]);
+      setFilteredBookmarks(prev => [...newOnes, ...prev]);
     }
-  }, [bookmarks]);
+  }
+}, [bookmarks]);
 
   useEffect(() => {
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
@@ -97,13 +113,13 @@ export default function HomeScreen({ navigation }) {
             try {
               await updateBookmark(bookmark.id, { imageWidth: img.width, imageHeight: img.height });
               updated++;
-            } catch (err) { console.error(`Failed to update ${bookmark.title}:`, err); }
+            } catch {}
             resolve();
           };
           img.onerror = () => resolve();
           img.src = bookmark.image;
         });
-      } catch (err) { console.error('Error updating bookmark:', err); }
+      } catch {}
     }
     setUpdatingDimensions(false);
     alert(`Updated ${updated} of ${missingDims.length} bookmarks!`);

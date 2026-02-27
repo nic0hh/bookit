@@ -1,0 +1,10 @@
+-- Add image dimension columns to bookmarks table
+
+alter table public.bookmarks 
+add column if not exists image_width integer,
+add column if not exists image_height integer;
+
+comment on column public.bookmarks.image_width is 'Original width of bookmark image in pixels';
+comment on column public.bookmarks.image_height is 'Original height of bookmark image in pixels';
+
+notify pgrst, 'reload schema';

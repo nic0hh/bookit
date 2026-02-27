@@ -42,9 +42,11 @@ Like a merge of Pinterest and Mindler, you can save and organise your bookmarks 
 2. Install dependencies
    `npm install`
 
-3. Create a Supabase project at https://supabase.com
-   - Run the SQL migrations in order from the `/sql` folder
-   - Enable email auth in Authentication settings
+3. Set up your Supabase database
+   - Go to your Supabase project → SQL Editor
+   - Open each file in the /sql folder in order (01 first, 09 last)
+   - Paste the contents into the SQL editor and click Run
+   - Do this for each file in order
 
 4. Create a Netlify account at https://netlify.com
    - Connect your repo

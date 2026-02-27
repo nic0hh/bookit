@@ -1,0 +1,147 @@
+-- Blocked users table
+create table if not exists public.blocked_users (
+  id uuid primary key default gen_random_uuid(),
+  blocker_id uuid not null references auth.users(id) on delete cascade,
+  blocked_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz default now(),
+  unique (blocker_id, blocked_id)
+);
+
+create index if not exists blocked_users_blocker_id_idx on public.blocked_users (blocker_id);
+create index if not exists blocked_users_blocked_id_idx on public.blocked_users (blocked_id);
+
+alter table public.blocked_users enable row level security;
+
+create policy "blocked_users_owner_all"
+  on public.blocked_users for all
+  using (auth.uid() = blocker_id)
+  with check (auth.uid() = blocker_id);
+
+-- Prevent share requests from blocked users
+create or replace function public.share_profile_with_email(viewer_email text)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_viewer uuid;
+begin
+  select id into v_viewer
+  from auth.users
+  where lower(email) = lower(viewer_email)
+  limit 1;
+
+  if v_viewer is null then
+    return jsonb_build_object('error', 'User not found');
+  end if;
+
+  if v_viewer = auth.uid() then
+    return jsonb_build_object('error', 'Cannot share with yourself');
+  end if;
+
+  -- Block check: prevent sharing if either party has blocked the other
+  if exists (
+    select 1 from public.blocked_users
+    where (blocker_id = auth.uid() and blocked_id = v_viewer)
+       or (blocker_id = v_viewer and blocked_id = auth.uid())
+  ) then
+    return jsonb_build_object('error', 'Unable to share with this user');
+  end if;
+
+  insert into public.shared_permissions (owner_id, viewer_id, viewer_email, share_all, share_home, folder_ids, status)
+  values (auth.uid(), v_viewer, viewer_email, true, false, '{}', 'pending')
+  on conflict (owner_id, viewer_id) do update
+    set viewer_email = excluded.viewer_email,
+        share_all = true,
+        status = 'pending',
+        updated_at = now();
+
+  return jsonb_build_object('ok', true, 'viewer_id', v_viewer);
+end;
+$$;
+
+-- RPC to block a user by email
+create or replace function public.block_user_by_email(target_email text)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_target uuid;
+begin
+  select id into v_target
+  from auth.users
+  where lower(email) = lower(target_email)
+  limit 1;
+
+  if v_target is null then
+    return jsonb_build_object('error', 'User not found');
+  end if;
+
+  if v_target = auth.uid() then
+    return jsonb_build_object('error', 'Cannot block yourself');
+  end if;
+
+  -- Insert block
+  insert into public.blocked_users (blocker_id, blocked_id)
+  values (auth.uid(), v_target)
+  on conflict (blocker_id, blocked_id) do nothing;
+
+  -- Remove any existing share permissions in both directions
+  delete from public.shared_permissions
+  where (owner_id = auth.uid() and viewer_id = v_target)
+     or (owner_id = v_target and viewer_id = auth.uid());
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- RPC to unblock a user by email
+create or replace function public.unblock_user_by_email(target_email text)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_target uuid;
+begin
+  select id into v_target
+  from auth.users
+  where lower(email) = lower(target_email)
+  limit 1;
+
+  if v_target is null then
+    return jsonb_build_object('error', 'User not found');
+  end if;
+
+  delete from public.blocked_users
+  where blocker_id = auth.uid()
+    and blocked_id = v_target;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- Load blocked users for the current user (returns emails)
+create or replace function public.get_blocked_users()
+returns table (email text, blocked_id uuid, created_at timestamptz)
+language plpgsql
+security definer
+as $$
+begin
+  return query
+  select u.email::text, bu.blocked_id, bu.created_at
+  from public.blocked_users bu
+  join auth.users u on u.id = bu.blocked_id
+  where bu.blocker_id = auth.uid()
+  order by bu.created_at desc;
+end;
+$$;
+
+grant usage on schema public to authenticated;
+grant all on public.blocked_users to authenticated;
+grant execute on function public.block_user_by_email(text) to authenticated;
+grant execute on function public.unblock_user_by_email(text) to authenticated;
+grant execute on function public.get_blocked_users() to authenticated;
+
+notify pgrst, 'reload schema';

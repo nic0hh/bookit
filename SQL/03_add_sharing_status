@@ -1,0 +1,77 @@
+-- Add status column to shared_permissions
+alter table public.shared_permissions 
+add column if not exists status text default 'pending' 
+check (status in ('pending', 'accepted', 'denied'));
+
+-- Update existing rows to 'accepted' (so current shares keep working)
+update public.shared_permissions 
+set status = 'accepted' 
+where status is null;
+
+-- Update RLS policies to only grant access when accepted
+drop policy if exists "bookmarks_viewer_select" on public.bookmarks;
+create policy "bookmarks_viewer_select"
+  on public.bookmarks for select
+  using (
+    exists (
+      select 1 from public.shared_permissions sp
+      where sp.owner_id = public.bookmarks.user_id
+        and sp.viewer_id = auth.uid()
+        and sp.status = 'accepted'
+        and (sp.share_all or public.bookmarks.folder_id = any(sp.folder_ids))
+    )
+  );
+
+drop policy if exists "folders_viewer_select" on public.folders;
+create policy "folders_viewer_select"
+  on public.folders for select
+  using (
+    exists (
+      select 1 from public.shared_permissions sp
+      where sp.owner_id = public.folders.user_id
+        and sp.viewer_id = auth.uid()
+        and sp.status = 'accepted'
+        and (sp.share_all or public.folders.id = any(sp.folder_ids))
+    )
+  );
+
+drop policy if exists "profiles_viewer_select" on public.profiles;
+create policy "profiles_viewer_select"
+  on public.profiles for select
+  using (
+    exists (
+      select 1 from public.shared_permissions sp
+      where sp.owner_id = public.profiles.id
+        and sp.viewer_id = auth.uid()
+        and sp.status = 'accepted'
+        and (sp.share_all or sp.share_home or array_length(sp.folder_ids, 1) > 0)
+    )
+  );
+
+-- Create RPC for accepting/denying requests
+create or replace function public.respond_to_share_request(request_id uuid, new_status text)
+returns jsonb
+language plpgsql
+security definer
+as $$
+begin
+  if new_status not in ('accepted', 'denied') then
+    return jsonb_build_object('error', 'Invalid status');
+  end if;
+
+  update public.shared_permissions
+  set status = new_status, updated_at = now()
+  where id = request_id
+    and viewer_id = auth.uid();
+
+  if not found then
+    return jsonb_build_object('error', 'Request not found or not authorized');
+  end if;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+grant execute on function public.respond_to_share_request(uuid, text) to authenticated;
+
+notify pgrst, 'reload schema';

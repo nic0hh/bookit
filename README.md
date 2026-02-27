@@ -37,7 +37,7 @@ Like a merge of Pinterest and Mindler, you can save and organise your bookmarks 
 ## Self-Hosting
 
 1. Clone the repo
-   `git clone https://github.com/yourusername/bookit.git`
+   `git clone https://github.com/nicoh/bookit.git`
 
 2. Install dependencies
    `npm install`

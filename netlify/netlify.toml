@@ -12,6 +12,7 @@ command = "expo export -p web"
 functions = "C:\\Users\\nicoh\\Bookit\\netlify\\functions"
 
 [build.environment]
+  SECRETS_SCAN_OMIT_PATHS = "dist/_expo/static/js/web"
 
 [build.processing]
 
@@ -28,3 +29,10 @@ functions = "C:\\Users\\nicoh\\Bookit\\netlify\\functions"
 [functions]
 
 [functions."*"]
+```
+
+Save it then push:
+```
+git add netlify.toml
+git commit -m "Fix Netlify secrets scan for public Supabase keys"
+git push

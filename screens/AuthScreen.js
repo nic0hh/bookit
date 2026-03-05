@@ -22,27 +22,28 @@ export default function AuthScreen() {
 
   // ── Detect password reset token in URL (web only) ────────────────────────
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+  if (Platform.OS !== 'web') return;
 
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      // Parse the token from the URL hash
-      const params = new URLSearchParams(hash.replace('#', ''));
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
+  const hash = window.location.hash;
+  if (!hash) return;
 
-      if (accessToken && refreshToken) {
-        supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-          .then(({ error }) => {
-            if (!error) {
-              setMode('newpassword');
-              // Clean up the URL
-              window.history.replaceState(null, '', window.location.pathname);
-            }
-          });
+  const params = new URLSearchParams(hash.substring(1));
+  const type = params.get('type');
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+
+  if (type === 'recovery' && accessToken && refreshToken) {
+    supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    }).then(({ error }) => {
+      if (!error) {
+        setMode('newpassword');
+        window.history.replaceState(null, '', window.location.pathname);
       }
-    }
-  }, []);
+    });
+  }
+}, []);
 
   // ── Set new password after reset ─────────────────────────────────────────
   const handleNewPassword = async () => {
@@ -71,7 +72,7 @@ export default function AuthScreen() {
 
     if (mode === 'reset') {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: window.location.origin + '/#type=recovery',
+        redirectTo: 'https://bookit-5000.netlify.app',
       });
       if (error) setErr(error.message);
       else setInfo('Password reset email sent. Check your inbox.');

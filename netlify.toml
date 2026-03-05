@@ -1,38 +1,7 @@
-functionsDirectory = "C:\\Users\\nicoh\\Bookit\\netlify\\functions"
-functionsDirectoryOrigin = "default"
-plugins = []
-headers = []
-redirects = []
-
 [build]
-publish = "C:\\Users\\nicoh\\Bookit\\dist"
-publishOrigin = "ui"
-commandOrigin = "ui"
-command = "expo export -p web"
-functions = "C:\\Users\\nicoh\\Bookit\\netlify\\functions"
+  command = "expo export -p web"
+  publish = "dist"
+  functions = "netlify/functions"
 
 [build.environment]
   SECRETS_SCAN_OMIT_PATHS = "dist/_expo/static/js/web"
-
-[build.processing]
-
-[build.processing.css]
-
-[build.processing.html]
-
-[build.processing.images]
-
-[build.processing.js]
-
-[build.services]
-
-[functions]
-
-[functions."*"]
-```
-
-Save it then push:
-```
-git add netlify.toml
-git commit -m "Fix Netlify secrets scan for public Supabase keys"
-git push

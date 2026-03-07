@@ -212,8 +212,20 @@ function AppInner() {
 function RootGate() {
   const { user, initializing, isVerified } = useContext(AuthContext);
   const { colors } = useContext(ThemeContext);
+  const [isRecovery, setIsRecovery] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const hash = window.location.hash;
+    if (!hash) return;
+    const params = new URLSearchParams(hash.substring(1));
+    if (params.get('type') === 'recovery') {
+      setIsRecovery(true);
+    }
+  }, []);
 
   if (initializing) return null;
+  if (isRecovery) return <AuthScreen />;
   if (!user) return <AuthScreen />;
   if (!isVerified) {
     return (
@@ -238,6 +250,13 @@ function RootGate() {
   }
   return <AppInner />;
 }
+```
+
+Then push:
+```
+git add App.js
+git commit -m "Fix password reset flow for logged in users"
+git push
 
 function AppNavigationRoot() {
   const { colors, themeName } = useContext(ThemeContext);

@@ -1,3 +1,4 @@
+//V2
 // App.js
 import React, { useContext, useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -250,13 +251,6 @@ function RootGate() {
   }
   return <AppInner />;
 }
-```
-
-Then push:
-```
-git add App.js
-git commit -m "Fix password reset flow for logged in users"
-git push
 
 function AppNavigationRoot() {
   const { colors, themeName } = useContext(ThemeContext);

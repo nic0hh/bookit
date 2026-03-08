@@ -1,4 +1,3 @@
-//V2
 // App.js
 import React, { useContext, useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -18,7 +17,6 @@ import {
   Quicksand_600SemiBold,
   Quicksand_700Bold,
 } from '@expo-google-fonts/quicksand';
-
 import HomeScreen from './screens/HomeScreen';
 import AddScreen from './screens/AddScreen';
 import FoldersScreen from './screens/FoldersScreen';
@@ -107,8 +105,6 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-
-        // ── Tab bar container ──
         tabBarStyle: {
           backgroundColor: colors.bottomBar,
           borderTopColor: colors.inputBorder,
@@ -118,44 +114,35 @@ function MainTabs() {
           paddingTop: 8,
           ...(Platform.OS === 'web' ? { height: 60, paddingBottom: 6, paddingTop: 6 } : {}),
         },
-
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.label,
-
         tabBarLabelStyle: {
           fontFamily: 'Quicksand_600SemiBold',
           fontSize: 10,
           marginTop: 2,
         },
-
-        // ── Per-tab icon ──
         tabBarIcon: ({ focused, color }) => {
           const icons = {
-            Home:    focused ? 'home'           : 'home-outline',
-            Folders: focused ? 'folder'         : 'folder-outline',
-            Add:     focused ? 'add-circle'     : 'add-circle-outline',
-            Profile: focused ? 'person'         : 'person-outline',
+            Home:    focused ? 'home'         : 'home-outline',
+            Folders: focused ? 'folder'       : 'folder-outline',
+            Add:     focused ? 'add-circle'   : 'add-circle-outline',
+            Profile: focused ? 'person'       : 'person-outline',
           };
           const name = icons[route.name] || 'ellipse-outline';
 
           if (route.name === 'Add') {
-  return (
-    <View style={{ alignItems: 'center' }}>
-      <Ionicons name={name} size={28} color={color} />
-      {focused && (
-        <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />
-      )}
-    </View>
-  );
-}
+            return (
+              <View style={{ alignItems: 'center' }}>
+                <Ionicons name={name} size={28} color={color} />
+                {focused && <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />}
+              </View>
+            );
+          }
 
-          // Active tab gets a small indicator dot
           return (
             <View style={{ alignItems: 'center' }}>
               <Ionicons name={name} size={22} color={color} />
-              {focused && (
-                <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />
-              )}
+              {focused && <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />}
             </View>
           );
         },
@@ -172,28 +159,15 @@ function MainTabs() {
           },
         })}
       />
-      <Tab.Screen
-        name="Folders"
-        component={FoldersScreen}
-        options={{ title: 'Folders' }}
-      />
-      <Tab.Screen
-        name="Add"
-        component={AddScreen}
-        options={{ title: '' }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ title: 'Profile' }}
-      />
+      <Tab.Screen name="Folders" component={FoldersScreen} options={{ title: 'Folders' }} />
+      <Tab.Screen name="Add" component={AddScreen} options={{ title: '' }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
 }
 
 function AppInner() {
   const { colors } = useContext(ThemeContext);
-
   const { migrating } = useContext(BookmarksContext);
 
   if (migrating) {
@@ -213,20 +187,13 @@ function AppInner() {
 function RootGate() {
   const { user, initializing, isVerified } = useContext(AuthContext);
   const { colors } = useContext(ThemeContext);
-  const [isRecovery, setIsRecovery] = useState(false);
 
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const hash = window.location.hash;
-    if (!hash) return;
-    const params = new URLSearchParams(hash.substring(1));
-    if (params.get('type') === 'recovery') {
-      setIsRecovery(true);
-    }
-  }, []);
+  const isRecovery = Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.hash.substring(1)).get('type') === 'recovery';
 
-  if (initializing) return null;
   if (isRecovery) return <AuthScreen />;
+  if (initializing) return null;
   if (!user) return <AuthScreen />;
   if (!isVerified) {
     return (
@@ -321,7 +288,6 @@ const tabStyles = StyleSheet.create({
   },
 });
 
-// Blob URL safety patch
 try {
   const _openURL = Linking.openURL;
   Linking.openURL = async (url) => {
@@ -333,5 +299,4 @@ try {
     if (typeof url === 'string' && url.startsWith('blob:')) return false;
     return _canOpen(url);
   };
-} catch (e) {
-}
+} catch (e) {}

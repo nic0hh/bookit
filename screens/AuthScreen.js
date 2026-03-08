@@ -24,7 +24,22 @@ export default function AuthScreen() {
 const { isRecovery } = useContext(AuthContext);
 
 useEffect(() => {
-  if (isRecovery) setMode('newpassword');
+  if (Platform.OS !== 'web') return;
+  if (!isRecovery) return;
+
+  const accessToken = sessionStorage.getItem('recovery_access_token');
+  const refreshToken = sessionStorage.getItem('recovery_refresh_token');
+
+  if (accessToken && refreshToken) {
+    supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ error }) => {
+        if (!error) {
+          sessionStorage.removeItem('recovery_access_token');
+          sessionStorage.removeItem('recovery_refresh_token');
+          setMode('newpassword');
+        }
+      });
+  }
 }, [isRecovery]);
 
   // ── Set new password after reset ─────────────────────────────────────────
@@ -54,7 +69,7 @@ useEffect(() => {
 
     if (mode === 'reset') {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'https://bookit-5000.netlify.app',
+        redirectTo: 'https://bookit-5000.netlify.app/auth-callback.html',
       });
       if (error) setErr(error.message);
       else setInfo('Password reset email sent. Check your inbox.');

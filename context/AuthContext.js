@@ -6,6 +6,7 @@ export const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
     let sub;
@@ -16,18 +17,22 @@ export function AuthProvider({ children }) {
         if (sessionUser) setUser(sessionUser);
       } catch (e) {}
 
-      // subscribe to changes so AuthContext and supabase client stay in sync
       try {
-        const resp = supabase.auth.onAuthStateChange((_event, session) => {
-          setUser(session?.user ?? null);
-          setInitializing(false); // ensure we stop initializing when auth state arrives
+        const resp = supabase.auth.onAuthStateChange((event, session) => {
+          if (event === 'PASSWORD_RECOVERY') {
+            setIsRecovery(true);
+            setUser(session?.user ?? null);
+          } else {
+            setIsRecovery(false);
+            setUser(session?.user ?? null);
+          }
+          setInitializing(false);
         });
         sub = resp?.data?.subscription;
       } catch (e) {
         setInitializing(false);
       }
 
-      // If no event fires, make sure we stop initializing
       setInitializing(false);
     })();
 
@@ -60,6 +65,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user,
       initializing,
+      isRecovery,
       signIn,
       signUp,
       signOut,

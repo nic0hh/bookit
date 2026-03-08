@@ -21,36 +21,11 @@ export default function AuthScreen() {
   const [info, setInfo] = useState('');
 
 // ── Detect password reset token in URL (web only) ────────────────────────
+const { isRecovery } = useContext(AuthContext);
+
 useEffect(() => {
-  if (Platform.OS !== 'web') return;
-
-  const hash = window.location.hash;
-  console.log('hash:', hash);
-
-  if (!hash) return;
-
-  const params = new URLSearchParams(hash.substring(1));
-  console.log('type:', params.get('type'));
-  console.log('access_token:', params.get('access_token'));
-
-  const type = params.get('type');
-  const accessToken = params.get('access_token');
-  const refreshToken = params.get('refresh_token');
-
-  if (type === 'recovery' && accessToken && refreshToken) {
-    supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    }).then(({ data, error }) => {
-      console.log('setSession error:', error);
-      console.log('setSession data:', data);
-      if (!error) {
-        setMode('newpassword');
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    });
-  }
-}, []);
+  if (isRecovery) setMode('newpassword');
+}, [isRecovery]);
 
   // ── Set new password after reset ─────────────────────────────────────────
   const handleNewPassword = async () => {

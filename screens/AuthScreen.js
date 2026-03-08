@@ -79,7 +79,7 @@ useEffect(() => {
 
     if (mode === 'reset') {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'https://bookit-5000.netlify.app/',
+        redirectTo: 'https://bookit-5000.netlify.app',
       });
       if (error) setErr(error.message);
       else setInfo('Password reset email sent. Check your inbox.');

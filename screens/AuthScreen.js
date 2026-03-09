@@ -52,7 +52,7 @@ export default function AuthScreen() {
     const { error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: otp.trim(),
-      type: 'recovery',
+      type: 'email',
     });
     if (error) {
       setErr('Invalid or expired code. Please try again.');
@@ -68,17 +68,22 @@ export default function AuthScreen() {
     setInfo('');
     setLoading(true);
 
-    if (mode === 'reset') {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
-      if (error) {
-        setErr(error.message);
-      } else {
-        setInfo('Check your email for a 6-digit code.');
-        setMode('otp');
-      }
-      setLoading(false);
-      return;
-    }
+if (mode === 'reset') {
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: {
+      shouldCreateUser: false,
+    },
+  });
+  if (error) {
+    setErr(error.message);
+  } else {
+    setInfo('Check your email for a 6-digit code.');
+    setMode('otp');
+  }
+  setLoading(false);
+  return;
+}
 
     if (mode === 'signup' && !isPasswordValid(pw)) {
       setErr('Password must be at least 8 characters, with letters and symbols.');

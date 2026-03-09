@@ -12,7 +12,7 @@ export default function AuthScreen() {
   const { signIn, signUp, setIsRecovery } = useContext(AuthContext);
   const { colors } = useContext(ThemeContext);
 
-  const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'reset' | 'otp' | 'newpassword'
+  const [mode, setMode] = useState('signin');
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [otp, setOtp] = useState('');
@@ -21,7 +21,6 @@ export default function AuthScreen() {
   const [err, setErr] = useState('');
   const [info, setInfo] = useState('');
 
-  // ── Set new password after OTP verified ──────────────────────────────────
   const handleNewPassword = async () => {
     setErr('');
     if (!isPasswordValid(newPw)) {
@@ -42,7 +41,6 @@ export default function AuthScreen() {
     setLoading(false);
   };
 
-  // ── Verify OTP code ───────────────────────────────────────────────────────
   const handleVerifyOtp = async () => {
     setErr('');
     if (!otp || otp.length < 6) {
@@ -50,21 +48,21 @@ export default function AuthScreen() {
       return;
     }
     setLoading(true);
+    setIsRecovery(true);
     const { error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: otp.trim(),
       type: 'email',
     });
     if (error) {
+      setIsRecovery(false);
       setErr('Invalid or expired code. Please try again.');
     } else {
-      setIsRecovery(true);
       setMode('newpassword');
     }
     setLoading(false);
   };
 
-  // ── Standard sign in / sign up / reset ───────────────────────────────────
   const submit = async () => {
     setErr('');
     setInfo('');
@@ -114,7 +112,6 @@ export default function AuthScreen() {
     marginBottom: 12,
   };
 
-  // ── OTP entry screen ──────────────────────────────────────────────────────
   if (mode === 'otp') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 20, justifyContent: 'center' }}>
@@ -159,7 +156,6 @@ export default function AuthScreen() {
     );
   }
 
-  // ── New password screen ───────────────────────────────────────────────────
   if (mode === 'newpassword') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 20, justifyContent: 'center' }}>
@@ -203,13 +199,11 @@ export default function AuthScreen() {
     );
   }
 
-  // ── Main auth screen ──────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, padding: 20, justifyContent: 'center' }}>
       <Text style={{ color: colors.text, fontSize: 24, marginBottom: 12, fontFamily: 'Quicksand_700Bold' }}>
         {mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
       </Text>
-
       <TextInput
         style={inputStyle}
         autoCapitalize="none"
@@ -219,7 +213,6 @@ export default function AuthScreen() {
         value={email}
         onChangeText={setEmail}
       />
-
       {mode !== 'reset' && (
         <>
           <TextInput
@@ -237,10 +230,8 @@ export default function AuthScreen() {
           )}
         </>
       )}
-
       {err ? <Text style={{ color: '#d72660', marginBottom: 10, fontFamily: 'Quicksand_500Medium' }}>{err}</Text> : null}
       {info ? <Text style={{ color: '#34c759', marginBottom: 10, fontFamily: 'Quicksand_500Medium', fontSize: 14 }}>{info}</Text> : null}
-
       <TouchableOpacity
         onPress={submit}
         disabled={loading || (mode === 'signup' && !isPasswordValid(pw))}
@@ -261,25 +252,21 @@ export default function AuthScreen() {
               {mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Sign Up' : 'Send Reset Code'}
             </Text>}
       </TouchableOpacity>
-
       {mode === 'signup' && pw && !isPasswordValid(pw) && (
         <Text style={{ color: '#d72660', fontSize: 13, marginTop: 6, fontFamily: 'Quicksand_400Regular' }}>
           Password must be at least 8 characters, with letters and symbols.
         </Text>
       )}
-
       {mode === 'signin' && (
         <TouchableOpacity onPress={() => { setMode('reset'); setErr(''); setInfo(''); }} style={{ marginTop: 12 }}>
           <Text style={{ color: colors.label, textAlign: 'center', fontFamily: 'Quicksand_400Regular' }}>Forgot password?</Text>
         </TouchableOpacity>
       )}
-
       {mode === 'reset' && (
         <TouchableOpacity onPress={() => { setMode('signin'); setErr(''); setInfo(''); }} style={{ marginTop: 12 }}>
           <Text style={{ color: colors.label, textAlign: 'center', fontFamily: 'Quicksand_400Regular' }}>Back to Sign In</Text>
         </TouchableOpacity>
       )}
-
       <TouchableOpacity
         onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setErr(''); setInfo(''); }}
         style={{ marginTop: 18 }}

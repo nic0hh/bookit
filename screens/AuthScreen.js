@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { ThemeContext } from '../ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
@@ -9,7 +9,7 @@ function isPasswordValid(pw) {
 }
 
 export default function AuthScreen() {
-  const { signIn, signUp } = useContext(AuthContext);
+  const { signIn, signUp, setIsRecovery } = useContext(AuthContext);
   const { colors } = useContext(ThemeContext);
 
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'reset' | 'otp' | 'newpassword'
@@ -33,6 +33,7 @@ export default function AuthScreen() {
     if (error) {
       setErr(error.message);
     } else {
+      setIsRecovery(false);
       setInfo('Password updated! You can now sign in.');
       setMode('signin');
       setNewPw('');
@@ -57,6 +58,7 @@ export default function AuthScreen() {
     if (error) {
       setErr('Invalid or expired code. Please try again.');
     } else {
+      setIsRecovery(true);
       setMode('newpassword');
     }
     setLoading(false);
@@ -68,22 +70,20 @@ export default function AuthScreen() {
     setInfo('');
     setLoading(true);
 
-if (mode === 'reset') {
-  const { error } = await supabase.auth.signInWithOtp({
-    email: email.trim(),
-    options: {
-      shouldCreateUser: false,
-    },
-  });
-  if (error) {
-    setErr(error.message);
-  } else {
-    setInfo('Check your email for a 6-digit code.');
-    setMode('otp');
-  }
-  setLoading(false);
-  return;
-}
+    if (mode === 'reset') {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { shouldCreateUser: false },
+      });
+      if (error) {
+        setErr(error.message);
+      } else {
+        setInfo('Check your email for a 6-digit code.');
+        setMode('otp');
+      }
+      setLoading(false);
+      return;
+    }
 
     if (mode === 'signup' && !isPasswordValid(pw)) {
       setErr('Password must be at least 8 characters, with letters and symbols.');

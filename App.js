@@ -185,7 +185,7 @@ function AppInner() {
 }
 
 function RootGate() {
-  const { user, initializing, isVerified } = useContext(AuthContext);
+  const { user, initializing, isVerified, isRecovery } = useContext(AuthContext);
   const { colors } = useContext(ThemeContext);
 
   const isRecovery = Platform.OS === 'web' &&
@@ -193,6 +193,7 @@ function RootGate() {
     window.location.hash.includes('recovery=true');
 
   if (initializing) return null;
+  if (isRecovery) return <AuthScreen />;
   if (isRecovery) return <AuthScreen />;
   if (!user) return <AuthScreen />;
   if (!isVerified) {

@@ -19,13 +19,7 @@ export function AuthProvider({ children }) {
 
       try {
         const resp = supabase.auth.onAuthStateChange((event, session) => {
-          if (event === 'PASSWORD_RECOVERY') {
-            setIsRecovery(true);
-            setUser(session?.user ?? null);
-          } else {
-            setIsRecovery(false);
-            setUser(session?.user ?? null);
-          }
+          setUser(session?.user ?? null);
           setInitializing(false);
         });
         sub = resp?.data?.subscription;
@@ -66,6 +60,7 @@ export function AuthProvider({ children }) {
       user,
       initializing,
       isRecovery,
+      setIsRecovery,
       signIn,
       signUp,
       signOut,

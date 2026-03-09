@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { ThemeContext } from '../ThemeContext';
 import { AuthContext } from '../context/AuthContext';
@@ -12,37 +12,16 @@ export default function AuthScreen() {
   const { signIn, signUp } = useContext(AuthContext);
   const { colors } = useContext(ThemeContext);
 
-  const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'reset' | 'newpassword'
+  const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'reset' | 'otp' | 'newpassword'
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
+  const [otp, setOtp] = useState('');
   const [newPw, setNewPw] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [info, setInfo] = useState('');
 
-// ── Detect password reset token in URL (web only) ────────────────────────
-const { isRecovery } = useContext(AuthContext);
-
-useEffect(() => {
-  if (Platform.OS !== 'web') return;
-  if (!isRecovery) return;
-
-  const accessToken = sessionStorage.getItem('recovery_access_token');
-  const refreshToken = sessionStorage.getItem('recovery_refresh_token');
-
-  if (accessToken && refreshToken) {
-    supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-      .then(({ error }) => {
-        if (!error) {
-          sessionStorage.removeItem('recovery_access_token');
-          sessionStorage.removeItem('recovery_refresh_token');
-          setMode('newpassword');
-        }
-      });
-  }
-}, [isRecovery]);
-
-  // ── Set new password after reset ─────────────────────────────────────────
+  // ── Set new password after OTP verified ──────────────────────────────────
   const handleNewPassword = async () => {
     setErr('');
     if (!isPasswordValid(newPw)) {
@@ -54,9 +33,31 @@ useEffect(() => {
     if (error) {
       setErr(error.message);
     } else {
-      setInfo('Password updated successfully! You can now sign in.');
+      setInfo('Password updated! You can now sign in.');
       setMode('signin');
       setNewPw('');
+      setEmail('');
+    }
+    setLoading(false);
+  };
+
+  // ── Verify OTP code ───────────────────────────────────────────────────────
+  const handleVerifyOtp = async () => {
+    setErr('');
+    if (!otp || otp.length < 6) {
+      setErr('Please enter the 6-digit code from your email.');
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: otp.trim(),
+      type: 'recovery',
+    });
+    if (error) {
+      setErr('Invalid or expired code. Please try again.');
+    } else {
+      setMode('newpassword');
     }
     setLoading(false);
   };
@@ -68,11 +69,13 @@ useEffect(() => {
     setLoading(true);
 
     if (mode === 'reset') {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'https://bookit-5000.netlify.app',
-      });
-      if (error) setErr(error.message);
-      else setInfo('Password reset email sent. Check your inbox.');
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (error) {
+        setErr(error.message);
+      } else {
+        setInfo('Check your email for a 6-digit code.');
+        setMode('otp');
+      }
       setLoading(false);
       return;
     }
@@ -84,7 +87,7 @@ useEffect(() => {
     }
 
     const fn = mode === 'signin' ? signIn : signUp;
-    const error = await fn(email.trim(), pw);
+    const { error } = await fn(email.trim(), pw);
 
     if (error) {
       setErr(error.message);
@@ -92,14 +95,6 @@ useEffect(() => {
       setInfo('Successful! Please check for an email from Supabase to activate your account.');
       setEmail('');
       setPw('');
-    } else {
-      const { data, error: sessionError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: pw,
-      });
-      if (!sessionError && data?.session) {
-        await supabase.auth.setSession(data.session);
-      }
     }
     setLoading(false);
   };
@@ -113,6 +108,51 @@ useEffect(() => {
     color: colors.text,
     marginBottom: 12,
   };
+
+  // ── OTP entry screen ──────────────────────────────────────────────────────
+  if (mode === 'otp') {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, padding: 20, justifyContent: 'center' }}>
+        <Text style={{ color: colors.text, fontSize: 24, marginBottom: 8, fontFamily: 'Quicksand_700Bold' }}>
+          Enter Code
+        </Text>
+        <Text style={{ color: colors.label, fontSize: 14, marginBottom: 20, fontFamily: 'Quicksand_400Regular' }}>
+          We sent a 6-digit code to {email}. Enter it below.
+        </Text>
+        <TextInput
+          style={inputStyle}
+          placeholder="6-digit code"
+          placeholderTextColor={colors.label}
+          value={otp}
+          onChangeText={setOtp}
+          keyboardType="number-pad"
+          maxLength={6}
+        />
+        {err ? <Text style={{ color: '#d72660', marginBottom: 10, fontFamily: 'Quicksand_500Medium' }}>{err}</Text> : null}
+        {info ? <Text style={{ color: '#34c759', marginBottom: 10, fontFamily: 'Quicksand_500Medium' }}>{info}</Text> : null}
+        <TouchableOpacity
+          onPress={handleVerifyOtp}
+          disabled={loading}
+          style={{
+            backgroundColor: colors.actionButton,
+            borderRadius: 15,
+            paddingVertical: 12,
+            alignItems: 'center',
+            borderWidth: 0.7,
+            borderColor: colors.actionButtonText,
+            opacity: loading ? 0.5 : 1,
+          }}
+        >
+          {loading
+            ? <ActivityIndicator color={colors.actionButtonText} />
+            : <Text style={{ color: colors.actionButtonText, fontFamily: 'Quicksand_600SemiBold' }}>Verify Code</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => { setMode('reset'); setErr(''); setInfo(''); setOtp(''); }} style={{ marginTop: 12 }}>
+          <Text style={{ color: colors.label, textAlign: 'center', fontFamily: 'Quicksand_400Regular' }}>Resend code</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   // ── New password screen ───────────────────────────────────────────────────
   if (mode === 'newpassword') {
@@ -213,7 +253,7 @@ useEffect(() => {
         {loading
           ? <ActivityIndicator color={colors.actionButtonText} />
           : <Text style={{ color: colors.actionButtonText, fontFamily: 'Quicksand_600SemiBold' }}>
-              {mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Sign Up' : 'Send Reset Email'}
+              {mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Sign Up' : 'Send Reset Code'}
             </Text>}
       </TouchableOpacity>
 

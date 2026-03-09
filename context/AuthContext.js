@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
 export const AuthContext = createContext();
@@ -7,6 +7,12 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
   const [isRecovery, setIsRecovery] = useState(false);
+  const isRecoveryRef = useRef(false);
+
+  const setIsRecoveryBoth = useCallback((val) => {
+    isRecoveryRef.current = val;
+    setIsRecovery(val);
+  }, []);
 
   useEffect(() => {
     let sub;
@@ -19,7 +25,9 @@ export function AuthProvider({ children }) {
 
       try {
         const resp = supabase.auth.onAuthStateChange((event, session) => {
-          setUser(session?.user ?? null);
+          if (!isRecoveryRef.current) {
+            setUser(session?.user ?? null);
+          }
           setInitializing(false);
         });
         sub = resp?.data?.subscription;
@@ -60,7 +68,7 @@ export function AuthProvider({ children }) {
       user,
       initializing,
       isRecovery,
-      setIsRecovery,
+      setIsRecovery: setIsRecoveryBoth,
       signIn,
       signUp,
       signOut,

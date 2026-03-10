@@ -1,5 +1,5 @@
 [build]
-  command = "expo export -p web && ls public && cp -v public/auth-callback.html dist/"
+  command = "expo export -p web"
   publish = "dist"
   functions = "netlify/functions"
 

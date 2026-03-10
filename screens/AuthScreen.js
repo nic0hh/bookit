@@ -9,10 +9,10 @@ function isPasswordValid(pw) {
 }
 
 export default function AuthScreen() {
-  const { signIn, signUp, setIsRecovery } = useContext(AuthContext);
+  const { signIn, signUp } = useContext(AuthContext);
   const { colors } = useContext(ThemeContext);
 
-  const [mode, setMode] = useState('signin');
+  const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'reset' | 'otp'
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [otp, setOtp] = useState('');
@@ -21,48 +21,45 @@ export default function AuthScreen() {
   const [err, setErr] = useState('');
   const [info, setInfo] = useState('');
 
-  const handleNewPassword = async () => {
-    setErr('');
-    if (!isPasswordValid(newPw)) {
-      setErr('Password must be at least 8 characters, with letters and symbols.');
-      return;
-    }
-    setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password: newPw });
-    if (error) {
-      setErr(error.message);
-    } else {
-      setIsRecovery(false);
-      setInfo('Password updated! You can now sign in.');
-      setMode('signin');
-      setNewPw('');
-      setEmail('');
-    }
-    setLoading(false);
-  };
-
+  // ── Verify OTP and update password in one step ────────────────────────────
   const handleVerifyOtp = async () => {
     setErr('');
     if (!otp || otp.length < 6) {
       setErr('Please enter the 6-digit code from your email.');
       return;
     }
+    if (!isPasswordValid(newPw)) {
+      setErr('Password must be at least 8 characters, with letters and symbols.');
+      return;
+    }
     setLoading(true);
-    setIsRecovery(true);
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: otp.trim(),
       type: 'email',
     });
     if (error) {
-      setIsRecovery(false);
       setErr('Invalid or expired code. Please try again.');
-    } else {
-      setMode('newpassword');
+      setLoading(false);
+      return;
+    }
+    if (data.session) {
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPw });
+      if (updateError) {
+        setErr(updateError.message);
+      } else {
+        await supabase.auth.signOut();
+        setMode('signin');
+        setInfo('Password updated! You can now sign in.');
+        setOtp('');
+        setNewPw('');
+        setEmail('');
+      }
     }
     setLoading(false);
   };
 
+  // ── Standard sign in / sign up / reset ───────────────────────────────────
   const submit = async () => {
     setErr('');
     setInfo('');
@@ -112,14 +109,15 @@ export default function AuthScreen() {
     marginBottom: 12,
   };
 
+  // ── OTP + new password screen ─────────────────────────────────────────────
   if (mode === 'otp') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 20, justifyContent: 'center' }}>
         <Text style={{ color: colors.text, fontSize: 24, marginBottom: 8, fontFamily: 'Quicksand_700Bold' }}>
-          Enter Code
+          Reset Password
         </Text>
         <Text style={{ color: colors.label, fontSize: 14, marginBottom: 20, fontFamily: 'Quicksand_400Regular' }}>
-          We sent a 6-digit code to {email}. Enter it below.
+          Enter the 6-digit code sent to {email} and choose a new password.
         </Text>
         <TextInput
           style={inputStyle}
@@ -130,6 +128,17 @@ export default function AuthScreen() {
           keyboardType="number-pad"
           maxLength={6}
         />
+        <TextInput
+          style={inputStyle}
+          secureTextEntry
+          placeholder="New password"
+          placeholderTextColor={colors.label}
+          value={newPw}
+          onChangeText={setNewPw}
+        />
+        <Text style={{ color: colors.label, fontSize: 13, marginBottom: 12, fontFamily: 'Quicksand_400Regular' }}>
+          Password must be at least 8 characters, with letters and symbols.
+        </Text>
         {err ? <Text style={{ color: '#d72660', marginBottom: 10, fontFamily: 'Quicksand_500Medium' }}>{err}</Text> : null}
         {info ? <Text style={{ color: '#34c759', marginBottom: 10, fontFamily: 'Quicksand_500Medium' }}>{info}</Text> : null}
         <TouchableOpacity
@@ -147,58 +156,16 @@ export default function AuthScreen() {
         >
           {loading
             ? <ActivityIndicator color={colors.actionButtonText} />
-            : <Text style={{ color: colors.actionButtonText, fontFamily: 'Quicksand_600SemiBold' }}>Verify Code</Text>}
+            : <Text style={{ color: colors.actionButtonText, fontFamily: 'Quicksand_600SemiBold' }}>Update Password</Text>}
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => { setMode('reset'); setErr(''); setInfo(''); setOtp(''); }} style={{ marginTop: 12 }}>
+        <TouchableOpacity onPress={() => { setMode('reset'); setErr(''); setInfo(''); setOtp(''); setNewPw(''); }} style={{ marginTop: 12 }}>
           <Text style={{ color: colors.label, textAlign: 'center', fontFamily: 'Quicksand_400Regular' }}>Resend code</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  if (mode === 'newpassword') {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background, padding: 20, justifyContent: 'center' }}>
-        <Text style={{ color: colors.text, fontSize: 24, marginBottom: 8, fontFamily: 'Quicksand_700Bold' }}>
-          Set New Password
-        </Text>
-        <Text style={{ color: colors.label, fontSize: 14, marginBottom: 20, fontFamily: 'Quicksand_400Regular' }}>
-          Choose a strong password for your account.
-        </Text>
-        <TextInput
-          style={inputStyle}
-          secureTextEntry
-          placeholder="New password"
-          placeholderTextColor={colors.label}
-          value={newPw}
-          onChangeText={setNewPw}
-        />
-        <Text style={{ color: colors.label, fontSize: 13, marginBottom: 12, fontFamily: 'Quicksand_400Regular' }}>
-          Password should contain upper and lowercase letters and symbols.
-        </Text>
-        {err ? <Text style={{ color: '#d72660', marginBottom: 10, fontFamily: 'Quicksand_500Medium' }}>{err}</Text> : null}
-        {info ? <Text style={{ color: '#34c759', marginBottom: 10, fontFamily: 'Quicksand_500Medium' }}>{info}</Text> : null}
-        <TouchableOpacity
-          onPress={handleNewPassword}
-          disabled={loading || !isPasswordValid(newPw)}
-          style={{
-            backgroundColor: colors.actionButton,
-            borderRadius: 15,
-            paddingVertical: 12,
-            alignItems: 'center',
-            borderWidth: 0.7,
-            borderColor: colors.actionButtonText,
-            opacity: loading || !isPasswordValid(newPw) ? 0.5 : 1,
-          }}
-        >
-          {loading
-            ? <ActivityIndicator color={colors.actionButtonText} />
-            : <Text style={{ color: colors.actionButtonText, fontFamily: 'Quicksand_600SemiBold' }}>Update Password</Text>}
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
+  // ── Main auth screen ──────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, padding: 20, justifyContent: 'center' }}>
       <Text style={{ color: colors.text, fontSize: 24, marginBottom: 12, fontFamily: 'Quicksand_700Bold' }}>

@@ -1,5 +1,5 @@
 // App.js
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -185,12 +185,10 @@ function AppInner() {
 }
 
 function RootGate() {
-  const { user, initializing, isVerified, isRecovery } = useContext(AuthContext);
+  const { user, initializing, isVerified } = useContext(AuthContext);
   const { colors } = useContext(ThemeContext);
 
   if (initializing) return null;
-  if (isRecovery) return <AuthScreen />;
-  if (isRecovery) return <AuthScreen />;
   if (!user) return <AuthScreen />;
   if (!isVerified) {
     return (

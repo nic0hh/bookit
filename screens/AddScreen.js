@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
 const STORAGE_BUCKET = 'bookmark-images';
 
+const windowWidth = Platform.OS === 'web' && typeof window !== 'undefined' ? window.innerWidth : 0;
+
 // ── Multi-folder picker ──────────────────────────────────────────────────────
 function MultiFolderPicker({ selectedIds, folders, onChange, colors }) {
   const [visible, setVisible] = useState(false);
@@ -114,25 +116,25 @@ function BookmarkForm({
       )}
 
       {/* Image — mobile only (web handles this in the left column) */}
-{Platform.OS !== 'web' && (
-  (preview.image || localImage) ? (
-    <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
-      <Image source={{ uri: localImage || preview.image }} style={styles.previewImage} />
-      <View style={styles.imageOverlay}>
-        <Ionicons name="camera-outline" size={22} color="#fff" />
-        <Text style={styles.imageOverlayText}>Change image</Text>
-      </View>
-    </TouchableOpacity>
-  ) : (
-    <TouchableOpacity
-      style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-      onPress={pickImage}
-    >
-      <Ionicons name="image-outline" size={28} color={colors.label} />
-      <Text style={[styles.imagePlaceholderText, { color: colors.label }]}>Upload image</Text>
-    </TouchableOpacity>
-  )
-)}
+      {Platform.OS !== 'web' && (
+        (preview.image || localImage) ? (
+          <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
+            <Image source={{ uri: localImage || preview.image }} style={styles.previewImage} />
+            <View style={styles.imageOverlay}>
+              <Ionicons name="camera-outline" size={22} color="#fff" />
+              <Text style={styles.imageOverlayText}>Change image</Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+            onPress={pickImage}
+          >
+            <Ionicons name="image-outline" size={28} color={colors.label} />
+            <Text style={[styles.imagePlaceholderText, { color: colors.label }]}>Upload image</Text>
+          </TouchableOpacity>
+        )
+      )}
 
       {/* Tags */}
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Tags</Text>
@@ -246,37 +248,34 @@ export default function AddScreen({ navigation }) {
     setLoading(false);
   };
 
-  const isRemoteUrl = (uri) => /^https?:\/\//i.test(uri);
+  const uploadImageIfNeeded = async (uri) => {
+    if (!uri) return { imageUrl: null, imagePath: null };
 
-const uploadImageIfNeeded = async (uri) => {
-  if (!uri) return { imageUrl: null, imagePath: null };
+    try {
+      const response = await fetch(uri);
+      if (!response.ok) throw new Error('Failed to fetch image');
+      const blob = await response.blob();
 
-  try {
-    const response = await fetch(uri);
-    if (!response.ok) throw new Error('Failed to fetch image');
-    const blob = await response.blob();
+      const contentType = blob.type || 'image/jpeg';
+      const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
+      const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
+      const filePath = `uploads/${fileName}`;
 
-    const contentType = blob.type || 'image/jpeg';
-    const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
-    const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
-    const filePath = `uploads/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(filePath, blob, { contentType, upsert: true });
 
-    const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(filePath, blob, { contentType, upsert: true });
+      if (uploadError) {
+        return { imageUrl: uri, imagePath: null };
+      }
 
-    if (uploadError) {
-      // Fall back to storing the URL directly if upload fails
+      return { imageUrl: null, imagePath: filePath };
+    } catch (err) {
       return { imageUrl: uri, imagePath: null };
     }
+  };
 
-    return { imageUrl: null, imagePath: filePath };
-  } catch (err) {
-    // Fall back to URL if we can't fetch/upload
-    return { imageUrl: uri, imagePath: null };
-  }
-};
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images });
     if (!result.cancelled && result.assets?.length > 0) {
@@ -434,15 +433,6 @@ const uploadImageIfNeeded = async (uri) => {
                     src={localImage || preview.image}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 16 }}
                   />
-                  <div style={{
-                    position: 'absolute', inset: 0, borderRadius: 16,
-                    background: 'rgba(0,0,0,0)', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    transition: 'background 0.2s',
-                  }}
-                    className="web-image-hover"
-                  >
-                  </div>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
@@ -481,7 +471,6 @@ const uploadImageIfNeeded = async (uri) => {
 }
 
 const styles = StyleSheet.create({
-  // ── URL screen ──
   urlScreen: {
     flex: 1,
     justifyContent: 'center',
@@ -536,8 +525,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: 'center',
   },
-
-  // ── Web two-column layout ──
   webLayout: {
     flex: 1,
     flexDirection: 'row',
@@ -583,16 +570,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
   },
-
-  // ── Mobile layout ──
   mobileForm: {
     flex: 1,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: 'hidden',
   },
-
-  // ── Shared form ──
   formContent: {
     padding: 20,
     paddingBottom: 40,
@@ -693,8 +676,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Quicksand_600SemiBold',
   },
-
-  // ── Folder picker ──
   pickerTrigger: {
     flexDirection: 'row',
     alignItems: 'center',

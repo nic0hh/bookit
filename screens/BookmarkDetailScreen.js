@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   View, Text, TextInput, Image, StyleSheet, ScrollView,
   TouchableOpacity, Modal, FlatList, Alert, Platform,
-  KeyboardAvoidingView, Linking
+  KeyboardAvoidingView, Linking, useWindowDimensions
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
@@ -15,7 +15,6 @@ import { supabase } from '../supabaseClient';
 
 const STORAGE_BUCKET = 'bookmark-images';
 const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
-const windowWidth = Platform.OS === 'web' && typeof window !== 'undefined' ? window.innerWidth : 0;
 
 // ── Shared folder picker ──────────────────────────────────────────────────────
 function MultiFolderPicker({ selectedIds, folders, onChange, colors }) {
@@ -82,6 +81,9 @@ export default function BookmarkDetailScreen({ navigation, route }) {
   const { updateBookmark, deleteBookmark, folders } = useContext(BookmarksContext);
   const { colors } = useContext(ThemeContext);
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+
+  const isWideWeb = Platform.OS === 'web' && windowWidth >= 700;
 
   const bookmark = route.params?.bookmark || {};
 
@@ -290,17 +292,11 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       />
 
       <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={[styles.actionChip, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-          onPress={copyUrl}
-        >
+        <TouchableOpacity style={[styles.actionChip, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]} onPress={copyUrl}>
           <Ionicons name="copy-outline" size={15} color={colors.label} />
           <Text style={[styles.actionChipText, { color: colors.label }]}>Copy</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionChip, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-          onPress={openUrl}
-        >
+        <TouchableOpacity style={[styles.actionChip, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]} onPress={openUrl}>
           <Ionicons name="open-outline" size={15} color={colors.label} />
           <Text style={[styles.actionChipText, { color: colors.label }]}>Open</Text>
         </TouchableOpacity>
@@ -310,29 +306,29 @@ export default function BookmarkDetailScreen({ navigation, route }) {
           disabled={refreshingMetadata}
         >
           <Ionicons name="refresh-outline" size={15} color={colors.label} />
-          <Text style={[styles.actionChipText, { color: colors.label }]}>
-            {refreshingMetadata ? 'Refreshing…' : 'Refresh'}
-          </Text>
+          <Text style={[styles.actionChipText, { color: colors.label }]}>{refreshingMetadata ? 'Refreshing…' : 'Refresh'}</Text>
         </TouchableOpacity>
       </View>
 
-      {Platform.OS !== 'web' && imageUri && (
-        <TouchableOpacity onPress={pickImage} style={styles.mobileImageWrapper}>
-          <Image source={{ uri: imageUri }} style={styles.mobileImage} resizeMode="cover" />
-          <View style={styles.imageOverlay}>
-            <Ionicons name="camera-outline" size={18} color="#fff" />
-            <Text style={styles.imageOverlayText}>Change image</Text>
-          </View>
-        </TouchableOpacity>
-      )}
-      {Platform.OS !== 'web' && !imageUri && (
-        <TouchableOpacity
-          style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-          onPress={pickImage}
-        >
-          <Ionicons name="image-outline" size={28} color={colors.label} />
-          <Text style={[styles.imagePlaceholderText, { color: colors.label }]}>Upload image</Text>
-        </TouchableOpacity>
+      {/* Image — shown in single column (mobile and mobile web) */}
+      {!isWideWeb && (
+        imageUri ? (
+          <TouchableOpacity onPress={pickImage} style={styles.mobileImageWrapper}>
+            <Image source={{ uri: imageUri }} style={styles.mobileImage} resizeMode="cover" />
+            <View style={styles.imageOverlay}>
+              <Ionicons name="camera-outline" size={18} color="#fff" />
+              <Text style={styles.imageOverlayText}>Change image</Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+            onPress={pickImage}
+          >
+            <Ionicons name="image-outline" size={28} color={colors.label} />
+            <Text style={[styles.imagePlaceholderText, { color: colors.label }]}>Upload image</Text>
+          </TouchableOpacity>
+        )
       )}
 
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Tags</Text>
@@ -356,12 +352,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       </View>
 
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Folders</Text>
-      <MultiFolderPicker
-        selectedIds={selectedFolders}
-        folders={folders}
-        onChange={setSelectedFolders}
-        colors={colors}
-      />
+      <MultiFolderPicker selectedIds={selectedFolders} folders={folders} onChange={setSelectedFolders} colors={colors} />
 
       <TouchableOpacity
         style={[styles.saveButton, { backgroundColor: colors.actionButton, opacity: saving ? 0.6 : 1 }]}
@@ -369,20 +360,12 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         disabled={saving}
       >
         <Ionicons name="checkmark-outline" size={18} color={colors.actionButtonText} style={{ marginRight: 8 }} />
-        <Text style={[styles.saveButtonText, { color: colors.actionButtonText }]}>
-          {saving ? 'Saving…' : 'Save Changes'}
-        </Text>
+        <Text style={[styles.saveButtonText, { color: colors.actionButtonText }]}>{saving ? 'Saving…' : 'Save Changes'}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.deleteButton, { opacity: removing ? 0.6 : 1 }]}
-        onPress={confirmDelete}
-        disabled={removing}
-      >
+      <TouchableOpacity style={[styles.deleteButton, { opacity: removing ? 0.6 : 1 }]} onPress={confirmDelete} disabled={removing}>
         <Ionicons name="trash-outline" size={16} color="#d72660" style={{ marginRight: 6 }} />
-        <Text style={styles.deleteButtonText}>
-          {removing ? 'Deleting…' : 'Delete Bookmark'}
-        </Text>
+        <Text style={styles.deleteButtonText}>{removing ? 'Deleting…' : 'Delete Bookmark'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -394,31 +377,21 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        {Platform.OS === 'web' && windowWidth >= 700 ? (
+        {isWideWeb ? (
           <View style={styles.webLayout}>
             <View style={styles.webLeft}>
               {imageUri ? (
                 <TouchableOpacity onPress={pickImage} style={styles.webImageWrapper}>
-                  <img
-                    src={imageUri}
-                    alt={title || 'Bookmark'}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 16 }}
-                  />
+                  <img src={imageUri} alt={title || 'Bookmark'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 16 }} />
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity
-                  style={[styles.webImagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                  onPress={pickImage}
-                >
+                <TouchableOpacity style={[styles.webImagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]} onPress={pickImage}>
                   <Ionicons name="image-outline" size={40} color={colors.label} />
                   <Text style={[styles.imagePlaceholderText, { color: colors.label, marginTop: 10 }]}>Click to upload image</Text>
                 </TouchableOpacity>
               )}
               {imageUri && (
-                <TouchableOpacity
-                  style={[styles.changeImageBtn, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                  onPress={pickImage}
-                >
+                <TouchableOpacity style={[styles.changeImageBtn, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]} onPress={pickImage}>
                   <Ionicons name="camera-outline" size={16} color={colors.label} />
                   <Text style={[styles.changeImageText, { color: colors.label }]}>Change image</Text>
                 </TouchableOpacity>

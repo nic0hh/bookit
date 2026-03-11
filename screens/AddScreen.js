@@ -2,7 +2,8 @@ import React, { useState, useContext } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View, TextInput, Text, Image, StyleSheet, ScrollView,
-  TouchableOpacity, Modal, FlatList, Alert, Platform, KeyboardAvoidingView
+  TouchableOpacity, Modal, FlatList, Alert, Platform,
+  KeyboardAvoidingView, useWindowDimensions
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { BookmarksContext } from '../context/BookmarksContext';
@@ -13,8 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
 const STORAGE_BUCKET = 'bookmark-images';
-
-const windowWidth = Platform.OS === 'web' && typeof window !== 'undefined' ? window.innerWidth : 0;
 
 // ── Multi-folder picker ──────────────────────────────────────────────────────
 function MultiFolderPicker({ selectedIds, folders, onChange, colors }) {
@@ -43,11 +42,7 @@ function MultiFolderPicker({ selectedIds, folders, onChange, colors }) {
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.pickerOverlay}
-          onPress={() => setVisible(false)}
-          activeOpacity={1}
-        >
+        <TouchableOpacity style={styles.pickerOverlay} onPress={() => setVisible(false)} activeOpacity={1}>
           <TouchableOpacity activeOpacity={1} onPress={() => {}}>
             <View style={[styles.pickerCard, { backgroundColor: colors.card }]}>
               <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Folders</Text>
@@ -101,7 +96,6 @@ function BookmarkForm({
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Title */}
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Title</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder, fontFamily: 'Quicksand_400Regular' }]}
@@ -115,28 +109,25 @@ function BookmarkForm({
         <Text style={styles.duplicateWarning}>{duplicateWarning}</Text>
       )}
 
-      {/* Image — mobile only (web handles this in the left column) */}
-      {Platform.OS !== 'web' && (
-        (preview.image || localImage) ? (
-          <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
-            <Image source={{ uri: localImage || preview.image }} style={styles.previewImage} />
-            <View style={styles.imageOverlay}>
-              <Ionicons name="camera-outline" size={22} color="#fff" />
-              <Text style={styles.imageOverlayText}>Change image</Text>
-            </View>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-            onPress={pickImage}
-          >
-            <Ionicons name="image-outline" size={28} color={colors.label} />
-            <Text style={[styles.imagePlaceholderText, { color: colors.label }]}>Upload image</Text>
-          </TouchableOpacity>
-        )
+      {/* Image — shown on native mobile AND mobile web (single column) */}
+      {(preview.image || localImage) ? (
+        <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
+          <Image source={{ uri: localImage || preview.image }} style={styles.previewImage} />
+          <View style={styles.imageOverlay}>
+            <Ionicons name="camera-outline" size={22} color="#fff" />
+            <Text style={styles.imageOverlayText}>Change image</Text>
+          </View>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.imagePlaceholder, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+          onPress={pickImage}
+        >
+          <Ionicons name="image-outline" size={28} color={colors.label} />
+          <Text style={[styles.imagePlaceholderText, { color: colors.label }]}>Upload image</Text>
+        </TouchableOpacity>
       )}
 
-      {/* Tags */}
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Tags</Text>
       <View style={[styles.tagsContainer, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}>
         {tags.map((tag, idx) => (
@@ -157,7 +148,6 @@ function BookmarkForm({
         />
       </View>
 
-      {/* Folders */}
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Folders</Text>
       <MultiFolderPicker
         selectedIds={selectedFolders}
@@ -169,7 +159,6 @@ function BookmarkForm({
         colors={colors}
       />
 
-      {/* Save */}
       <TouchableOpacity
         style={[styles.saveButton, { backgroundColor: colors.actionButton }]}
         onPress={saveBookmark}
@@ -185,6 +174,9 @@ function BookmarkForm({
 export default function AddScreen({ navigation }) {
   const { addBookmark, folders, bookmarks } = useContext(BookmarksContext);
   const { colors } = useContext(ThemeContext);
+  const { width: windowWidth } = useWindowDimensions();
+
+  const isWideWeb = Platform.OS === 'web' && windowWidth >= 700;
 
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -250,26 +242,19 @@ export default function AddScreen({ navigation }) {
 
   const uploadImageIfNeeded = async (uri) => {
     if (!uri) return { imageUrl: null, imagePath: null };
-
     try {
       const response = await fetch(uri);
       if (!response.ok) throw new Error('Failed to fetch image');
       const blob = await response.blob();
-
       const contentType = blob.type || 'image/jpeg';
       const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
       const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
       const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
       const filePath = `uploads/${fileName}`;
-
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
         .upload(filePath, blob, { contentType, upsert: true });
-
-      if (uploadError) {
-        return { imageUrl: uri, imagePath: null };
-      }
-
+      if (uploadError) return { imageUrl: uri, imagePath: null };
       return { imageUrl: null, imagePath: filePath };
     } catch (err) {
       return { imageUrl: uri, imagePath: null };
@@ -356,26 +341,16 @@ export default function AddScreen({ navigation }) {
     duplicateWarning, saveBookmark, url, colors, folders,
   };
 
-  // ── URL entry state (no preview yet) ──
+  // ── URL entry state ──
   if (!preview.url) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={styles.urlScreen}>
-          <View style={[
-            styles.urlCard,
-            { backgroundColor: colors.card },
-            Platform.OS === 'web' && styles.urlCardWeb,
-          ]}>
+          <View style={[styles.urlCard, { backgroundColor: colors.card }, Platform.OS === 'web' && styles.urlCardWeb]}>
             <Text style={[styles.urlHeading, { color: colors.text }]}>Add a bookmark</Text>
             <Text style={[styles.urlSubheading, { color: colors.label }]}>Paste a URL to get started</Text>
-
             <TextInput
-              style={[styles.urlInput, {
-                backgroundColor: colors.inputBackground,
-                color: colors.text,
-                borderColor: colors.inputBorder,
-                fontFamily: 'Quicksand_400Regular',
-              }]}
+              style={[styles.urlInput, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder, fontFamily: 'Quicksand_400Regular' }]}
               value={url}
               onChangeText={setUrl}
               onBlur={() => { if (url) checkDuplicate(url); }}
@@ -386,11 +361,7 @@ export default function AddScreen({ navigation }) {
               autoCorrect={false}
               returnKeyType="go"
             />
-
-            {duplicateWarning && (
-              <Text style={styles.duplicateWarning}>{duplicateWarning}</Text>
-            )}
-
+            {duplicateWarning && <Text style={styles.duplicateWarning}>{duplicateWarning}</Text>}
             <TouchableOpacity
               style={[styles.fetchButton, { backgroundColor: colors.actionButton, opacity: url ? 1 : 0.5 }]}
               onPress={fetchPreview}
@@ -404,10 +375,7 @@ export default function AddScreen({ navigation }) {
                   </>
               }
             </TouchableOpacity>
-
-            {previewError ? (
-              <Text style={[styles.errorText, { color: colors.label }]}>{previewError}</Text>
-            ) : null}
+            {previewError ? <Text style={[styles.errorText, { color: colors.label }]}>{previewError}</Text> : null}
           </View>
         </View>
       </SafeAreaView>
@@ -422,10 +390,9 @@ export default function AddScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        {Platform.OS === 'web' && windowWidth >= 700 ? (
-          // Web: two-column layout
+        {isWideWeb ? (
+          // Wide web: two-column layout
           <View style={styles.webLayout}>
-            {/* Left: image preview */}
             <View style={styles.webLeft}>
               {(preview.image || localImage) ? (
                 <TouchableOpacity onPress={pickImage} style={styles.webImageWrapper}>
@@ -453,14 +420,12 @@ export default function AddScreen({ navigation }) {
                 </TouchableOpacity>
               )}
             </View>
-
-            {/* Right: form */}
             <View style={[styles.webRight, { backgroundColor: colors.card }]}>
               <BookmarkForm {...formProps} />
             </View>
           </View>
         ) : (
-          // Mobile: single column
+          // Mobile and narrow web: single column with image inside form
           <View style={[styles.mobileForm, { backgroundColor: colors.card }]}>
             <BookmarkForm {...formProps} />
           </View>
@@ -471,268 +436,47 @@ export default function AddScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  urlScreen: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  urlCard: {
-    width: '100%',
-    borderRadius: 20,
-    padding: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  urlCardWeb: {
-    maxWidth: 520,
-  },
-  urlHeading: {
-    fontSize: 22,
-    fontFamily: 'Quicksand_700Bold',
-    marginBottom: 6,
-  },
-  urlSubheading: {
-    fontSize: 14,
-    fontFamily: 'Quicksand_400Regular',
-    marginBottom: 24,
-  },
-  urlInput: {
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
-    fontSize: 15,
-    marginBottom: 8,
-  },
-  fetchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    paddingVertical: 14,
-    marginTop: 8,
-  },
-  fetchButtonText: {
-    fontSize: 16,
-    fontFamily: 'Quicksand_600SemiBold',
-  },
-  errorText: {
-    fontSize: 13,
-    fontFamily: 'Quicksand_400Regular',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  webLayout: {
-    flex: 1,
-    flexDirection: 'row',
-    padding: 24,
-    gap: 24,
-  },
-  webLeft: {
-    flex: 1,
-    maxWidth: 480,
-  },
-  webImageWrapper: {
-    flex: 1,
-    minHeight: 300,
-    borderRadius: 16,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  webImagePlaceholder: {
-    flex: 1,
-    minHeight: 300,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  changeImageBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  changeImageText: {
-    fontSize: 13,
-    fontFamily: 'Quicksand_500Medium',
-  },
-  webRight: {
-    flex: 1,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  mobileForm: {
-    flex: 1,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    overflow: 'hidden',
-  },
-  formContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  fieldLabel: {
-    fontSize: 11,
-    fontFamily: 'Quicksand_600SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 15,
-  },
-  duplicateWarning: {
-    color: '#ef4444',
-    fontSize: 12,
-    fontFamily: 'Quicksand_400Regular',
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  imageWrapper: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    position: 'relative',
-    height: 180,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 12,
-  },
-  imageOverlay: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    gap: 6,
-  },
-  imageOverlayText: {
-    color: '#fff',
-    fontSize: 13,
-    fontFamily: 'Quicksand_500Medium',
-  },
-  imagePlaceholder: {
-    height: 120,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  imagePlaceholderText: {
-    fontSize: 13,
-    fontFamily: 'Quicksand_400Regular',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 8,
-    gap: 6,
-    minHeight: 46,
-  },
-  tagBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tagText: {
-    fontSize: 13,
-  },
-  tagInput: {
-    fontSize: 14,
-    minWidth: 100,
-    paddingVertical: 2,
-    flex: 1,
-  },
-  saveButton: {
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontFamily: 'Quicksand_600SemiBold',
-  },
-  pickerTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-  },
-  pickerTriggerText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pickerCard: {
-    borderRadius: 16,
-    padding: 20,
-    width: 300,
-    maxHeight: 420,
-  },
-  pickerTitle: {
-    fontSize: 16,
-    fontFamily: 'Quicksand_700Bold',
-    marginBottom: 14,
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  pickerRowText: {
-    fontSize: 15,
-    fontFamily: 'Quicksand_400Regular',
-    flex: 1,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pickerDone: {
-    marginTop: 14,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  pickerDoneText: {
-    fontSize: 15,
-    fontFamily: 'Quicksand_600SemiBold',
-  },
+  urlScreen: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  urlCard: { width: '100%', borderRadius: 20, padding: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 16, elevation: 6 },
+  urlCardWeb: { maxWidth: 520 },
+  urlHeading: { fontSize: 22, fontFamily: 'Quicksand_700Bold', marginBottom: 6 },
+  urlSubheading: { fontSize: 14, fontFamily: 'Quicksand_400Regular', marginBottom: 24 },
+  urlInput: { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 15, marginBottom: 8 },
+  fetchButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 14, paddingVertical: 14, marginTop: 8 },
+  fetchButtonText: { fontSize: 16, fontFamily: 'Quicksand_600SemiBold' },
+  errorText: { fontSize: 13, fontFamily: 'Quicksand_400Regular', marginTop: 12, textAlign: 'center' },
+  webLayout: { flex: 1, flexDirection: 'row', padding: 24, gap: 24 },
+  webLeft: { flex: 1, maxWidth: 480 },
+  webImageWrapper: { flex: 1, minHeight: 300, borderRadius: 16, overflow: 'hidden', position: 'relative' },
+  webImagePlaceholder: { flex: 1, minHeight: 300, borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  changeImageBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  changeImageText: { fontSize: 13, fontFamily: 'Quicksand_500Medium' },
+  webRight: { flex: 1, borderRadius: 20, overflow: 'hidden' },
+  mobileForm: { flex: 1, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
+  formContent: { padding: 20, paddingBottom: 40 },
+  fieldLabel: { fontSize: 11, fontFamily: 'Quicksand_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 16 },
+  input: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15 },
+  duplicateWarning: { color: '#ef4444', fontSize: 12, fontFamily: 'Quicksand_400Regular', marginTop: 6, marginBottom: 4 },
+  imageWrapper: { borderRadius: 12, overflow: 'hidden', position: 'relative', height: 180, marginTop: 8 },
+  previewImage: { width: '100%', height: '100%', borderRadius: 12 },
+  imageOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, gap: 6 },
+  imageOverlayText: { color: '#fff', fontSize: 13, fontFamily: 'Quicksand_500Medium' },
+  imagePlaceholder: { height: 120, borderRadius: 12, borderWidth: 2, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 8 },
+  imagePlaceholderText: { fontSize: 13, fontFamily: 'Quicksand_400Regular' },
+  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 8, gap: 6, minHeight: 46 },
+  tagBubble: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  tagText: { fontSize: 13 },
+  tagInput: { fontSize: 14, minWidth: 100, paddingVertical: 2, flex: 1 },
+  saveButton: { borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
+  saveButtonText: { fontSize: 16, fontFamily: 'Quicksand_600SemiBold' },
+  pickerTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 12, padding: 12 },
+  pickerTriggerText: { fontSize: 14, flex: 1 },
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
+  pickerCard: { borderRadius: 16, padding: 20, width: 300, maxHeight: 420 },
+  pickerTitle: { fontSize: 16, fontFamily: 'Quicksand_700Bold', marginBottom: 14 },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1 },
+  pickerRowText: { fontSize: 15, fontFamily: 'Quicksand_400Regular', flex: 1 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
+  pickerDone: { marginTop: 14, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  pickerDoneText: { fontSize: 15, fontFamily: 'Quicksand_600SemiBold' },
 });

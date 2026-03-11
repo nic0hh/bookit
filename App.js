@@ -112,7 +112,7 @@ function MainTabs() {
           height: Platform.OS === 'ios' ? 80 : 62,
           paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 8,
-          ...(Platform.OS === 'web' ? { height: 70, paddingBottom: 16, paddingTop: 6 } : {}),
+          ...(Platform.OS === 'web' ? { height: 75, paddingBottom: 20, paddingTop: 6 } : {}),
         },
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.label,

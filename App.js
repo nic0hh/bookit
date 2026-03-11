@@ -55,6 +55,11 @@ if (Platform.OS === 'web') {
       height: 100%;
       overflow: auto;
     }
+    div[role="tablist"] {
+      padding-bottom: env(safe-area-inset-bottom) !important;
+      height: calc(60px + env(safe-area-inset-bottom)) !important;
+      box-sizing: content-box !important;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -112,7 +117,7 @@ function MainTabs() {
           height: Platform.OS === 'ios' ? 80 : 62,
           paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 8,
-          ...(Platform.OS === 'web' ? { height: 75, paddingBottom: 20, paddingTop: 6 } : {}),
+          ...(Platform.OS === 'web' ? { height: 60, paddingBottom: 6, paddingTop: 6 } : {}),
         },
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.label,

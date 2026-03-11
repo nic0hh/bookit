@@ -15,8 +15,9 @@ import { supabase } from '../supabaseClient';
 
 const STORAGE_BUCKET = 'bookmark-images';
 const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
+const windowWidth = Platform.OS === 'web' && typeof window !== 'undefined' ? window.innerWidth : 0;
 
-// ── Shared folder picker (same pattern as AddScreen) ─────────────────────────
+// ── Shared folder picker ──────────────────────────────────────────────────────
 function MultiFolderPicker({ selectedIds, folders, onChange, colors }) {
   const [visible, setVisible] = useState(false);
 
@@ -116,35 +117,26 @@ export default function BookmarkDetailScreen({ navigation, route }) {
 
   const isRemoteUrl = (uri) => /^https?:\/\//i.test(uri);
 
- const uploadImageIfNeeded = async (uri) => {
-  if (!uri) return { imageUrl: null, imagePath: null };
-
-  try {
-    const response = await fetch(uri);
-    if (!response.ok) throw new Error('Failed to fetch image');
-    const blob = await response.blob();
-
-    const contentType = blob.type || 'image/jpeg';
-    const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
-    const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
-    const filePath = `uploads/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(filePath, blob, { contentType, upsert: true });
-
-    if (uploadError) {
-      // Fall back to storing the URL directly if upload fails
+  const uploadImageIfNeeded = async (uri) => {
+    if (!uri) return { imageUrl: null, imagePath: null };
+    try {
+      const response = await fetch(uri);
+      if (!response.ok) throw new Error('Failed to fetch image');
+      const blob = await response.blob();
+      const contentType = blob.type || 'image/jpeg';
+      const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
+      const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
+      const filePath = `uploads/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(filePath, blob, { contentType, upsert: true });
+      if (uploadError) return { imageUrl: uri, imagePath: null };
+      return { imageUrl: null, imagePath: filePath };
+    } catch (err) {
       return { imageUrl: uri, imagePath: null };
     }
-
-    return { imageUrl: null, imagePath: filePath };
-  } catch (err) {
-    // Fall back to URL if we can't fetch/upload
-    return { imageUrl: uri, imagePath: null };
-  }
-};
+  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images });
@@ -270,7 +262,6 @@ export default function BookmarkDetailScreen({ navigation, route }) {
     } catch { Alert.alert('Error', 'Failed to open URL.'); }
   };
 
-  // ── Shared form content ──
   const FormContent = () => (
     <ScrollView
       style={{ flex: 1 }}
@@ -278,7 +269,6 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Title */}
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Title</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder, fontFamily: 'Quicksand_400Regular' }]}
@@ -288,7 +278,6 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         placeholderTextColor={colors.label}
       />
 
-      {/* URL */}
       <Text style={[styles.fieldLabel, { color: colors.label }]}>URL</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder, fontFamily: 'Quicksand_400Regular' }]}
@@ -300,7 +289,6 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         autoCorrect={false}
       />
 
-      {/* URL actions row */}
       <View style={styles.actionRow}>
         <TouchableOpacity
           style={[styles.actionChip, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
@@ -328,14 +316,9 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      {/* Mobile-only image (web shows in left column) */}
       {Platform.OS !== 'web' && imageUri && (
         <TouchableOpacity onPress={pickImage} style={styles.mobileImageWrapper}>
-          <Image
-            source={{ uri: imageUri }}
-            style={styles.mobileImage}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: imageUri }} style={styles.mobileImage} resizeMode="cover" />
           <View style={styles.imageOverlay}>
             <Ionicons name="camera-outline" size={18} color="#fff" />
             <Text style={styles.imageOverlayText}>Change image</Text>
@@ -352,7 +335,6 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         </TouchableOpacity>
       )}
 
-      {/* Tags */}
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Tags</Text>
       <View style={[styles.tagsContainer, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}>
         {tags.map((tag, idx) => (
@@ -373,7 +355,6 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         />
       </View>
 
-      {/* Folders */}
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Folders</Text>
       <MultiFolderPicker
         selectedIds={selectedFolders}
@@ -382,7 +363,6 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         colors={colors}
       />
 
-      {/* Save */}
       <TouchableOpacity
         style={[styles.saveButton, { backgroundColor: colors.actionButton, opacity: saving ? 0.6 : 1 }]}
         onPress={onSave}
@@ -394,7 +374,6 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         </Text>
       </TouchableOpacity>
 
-      {/* Delete */}
       <TouchableOpacity
         style={[styles.deleteButton, { opacity: removing ? 0.6 : 1 }]}
         onPress={confirmDelete}
@@ -416,9 +395,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
         {Platform.OS === 'web' && windowWidth >= 700 ? (
-          // Web: two-column layout matching AddScreen
           <View style={styles.webLayout}>
-            {/* Left: image */}
             <View style={styles.webLeft}>
               {imageUri ? (
                 <TouchableOpacity onPress={pickImage} style={styles.webImageWrapper}>
@@ -447,14 +424,11 @@ export default function BookmarkDetailScreen({ navigation, route }) {
                 </TouchableOpacity>
               )}
             </View>
-
-            {/* Right: form */}
             <View style={[styles.webRight, { backgroundColor: colors.card }]}>
               <FormContent />
             </View>
           </View>
         ) : (
-          // Mobile: single column
           <View style={[styles.mobileForm, { backgroundColor: colors.card }]}>
             <FormContent />
           </View>
@@ -465,233 +439,42 @@ export default function BookmarkDetailScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  // ── Web layout ──
-  webLayout: {
-    flex: 1,
-    flexDirection: 'row',
-    padding: 24,
-    gap: 24,
-  },
-  webLeft: {
-    flex: 1,
-    maxWidth: 480,
-  },
-  webImageWrapper: {
-    flex: 1,
-    minHeight: 300,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  webImagePlaceholder: {
-    flex: 1,
-    minHeight: 300,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  changeImageBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  changeImageText: {
-    fontSize: 13,
-    fontFamily: 'Quicksand_500Medium',
-  },
-  webRight: {
-    flex: 1,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-
-  // ── Mobile layout ──
-  mobileForm: {
-    flex: 1,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    overflow: 'hidden',
-  },
-
-  // ── Form ──
-  formContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  fieldLabel: {
-    fontSize: 11,
-    fontFamily: 'Quicksand_600SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 15,
-  },
-
-  // URL action chips
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  actionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  actionChipText: {
-    fontSize: 13,
-    fontFamily: 'Quicksand_500Medium',
-  },
-
-  // Mobile image
-  mobileImageWrapper: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    height: 180,
-    marginTop: 8,
-  },
-  mobileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imageOverlay: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    gap: 6,
-  },
-  imageOverlayText: {
-    color: '#fff',
-    fontSize: 13,
-    fontFamily: 'Quicksand_500Medium',
-  },
-  imagePlaceholder: {
-    height: 120,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  imagePlaceholderText: {
-    fontSize: 13,
-    fontFamily: 'Quicksand_400Regular',
-  },
-
-  // Tags
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 8,
-    gap: 6,
-    minHeight: 46,
-  },
-  tagBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
+  webLayout: { flex: 1, flexDirection: 'row', padding: 24, gap: 24 },
+  webLeft: { flex: 1, maxWidth: 480 },
+  webImageWrapper: { flex: 1, minHeight: 300, borderRadius: 16, overflow: 'hidden' },
+  webImagePlaceholder: { flex: 1, minHeight: 300, borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  changeImageBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  changeImageText: { fontSize: 13, fontFamily: 'Quicksand_500Medium' },
+  webRight: { flex: 1, borderRadius: 20, overflow: 'hidden' },
+  mobileForm: { flex: 1, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
+  formContent: { padding: 20, paddingBottom: 40 },
+  fieldLabel: { fontSize: 11, fontFamily: 'Quicksand_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 16 },
+  input: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15 },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  actionChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1 },
+  actionChipText: { fontSize: 13, fontFamily: 'Quicksand_500Medium' },
+  mobileImageWrapper: { borderRadius: 12, overflow: 'hidden', height: 180, marginTop: 8 },
+  mobileImage: { width: '100%', height: '100%' },
+  imageOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, gap: 6 },
+  imageOverlayText: { color: '#fff', fontSize: 13, fontFamily: 'Quicksand_500Medium' },
+  imagePlaceholder: { height: 120, borderRadius: 12, borderWidth: 2, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 8 },
+  imagePlaceholderText: { fontSize: 13, fontFamily: 'Quicksand_400Regular' },
+  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 8, gap: 6, minHeight: 46 },
+  tagBubble: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   tagText: { fontSize: 13 },
-  tagInput: {
-    fontSize: 14,
-    minWidth: 100,
-    paddingVertical: 2,
-    flex: 1,
-  },
-
-  // Buttons
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    paddingVertical: 15,
-    marginTop: 24,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontFamily: 'Quicksand_600SemiBold',
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    marginTop: 10,
-  },
-  deleteButtonText: {
-    fontSize: 14,
-    fontFamily: 'Quicksand_500Medium',
-    color: '#d72660',
-  },
-
-  // Folder picker
-  pickerTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-  },
+  tagInput: { fontSize: 14, minWidth: 100, paddingVertical: 2, flex: 1 },
+  saveButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 14, paddingVertical: 15, marginTop: 24 },
+  saveButtonText: { fontSize: 16, fontFamily: 'Quicksand_600SemiBold' },
+  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginTop: 10 },
+  deleteButtonText: { fontSize: 14, fontFamily: 'Quicksand_500Medium', color: '#d72660' },
+  pickerTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 12, padding: 12 },
   pickerTriggerText: { fontSize: 14, flex: 1 },
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pickerCard: {
-    borderRadius: 16,
-    padding: 20,
-    width: 300,
-    maxHeight: 420,
-  },
-  pickerTitle: {
-    fontSize: 16,
-    fontFamily: 'Quicksand_700Bold',
-    marginBottom: 14,
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
+  pickerCard: { borderRadius: 16, padding: 20, width: 300, maxHeight: 420 },
+  pickerTitle: { fontSize: 16, fontFamily: 'Quicksand_700Bold', marginBottom: 14 },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1 },
   pickerRowText: { fontSize: 15, fontFamily: 'Quicksand_400Regular', flex: 1 },
-  checkbox: {
-    width: 22, height: 22,
-    borderRadius: 6, borderWidth: 2,
-    marginRight: 12,
-    justifyContent: 'center', alignItems: 'center',
-  },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
   pickerDone: { marginTop: 14, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   pickerDoneText: { fontSize: 15, fontFamily: 'Quicksand_600SemiBold' },
 });

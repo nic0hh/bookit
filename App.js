@@ -56,9 +56,7 @@ if (Platform.OS === 'web') {
       overflow: auto;
     }
     div[role="tablist"] {
-      padding-bottom: env(safe-area-inset-bottom) !important;
-      height: calc(60px + env(safe-area-inset-bottom)) !important;
-      box-sizing: content-box !important;
+      overflow: visible !important;
     }
   `;
   document.head.appendChild(style);
@@ -117,7 +115,7 @@ function MainTabs() {
           height: Platform.OS === 'ios' ? 80 : 62,
           paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 8,
-          ...(Platform.OS === 'web' ? { height: 60, paddingBottom: 6, paddingTop: 6 } : {}),
+          ...(Platform.OS === 'web' ? { height: 60, paddingBottom: 6, paddingTop: 6, overflow: 'visible' } : {}),
         },
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.label,
@@ -137,7 +135,7 @@ function MainTabs() {
 
           if (route.name === 'Add') {
             return (
-              <View style={{ alignItems: 'center' }}>
+              <View style={{ alignItems: 'center', height: 32, justifyContent: 'center' }}>
                 <Ionicons name={name} size={28} color={color} />
                 {focused && <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />}
               </View>
@@ -145,7 +143,7 @@ function MainTabs() {
           }
 
           return (
-            <View style={{ alignItems: 'center' }}>
+            <View style={{ alignItems: 'center', height: 26, justifyContent: 'center' }}>
               <Ionicons name={name} size={22} color={color} />
               {focused && <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />}
             </View>
@@ -271,15 +269,6 @@ export default function App() {
 }
 
 const tabStyles = StyleSheet.create({
-  addPill: {
-    width: 44,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
   activeDot: {
     width: 4,
     height: 4,

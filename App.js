@@ -124,7 +124,7 @@ function MainTabs() {
           fontSize: 10,
           marginTop: 2,
         },
-        tabBarIcon: ({ focused, color }) => {
+        tabBarIcon: ({ focused, color, size }) => {
           const icons = {
             Home:    focused ? 'home'         : 'home-outline',
             Folders: focused ? 'folder'       : 'folder-outline',
@@ -133,18 +133,9 @@ function MainTabs() {
           };
           const name = icons[route.name] || 'ellipse-outline';
 
-          if (route.name === 'Add') {
-            return (
-              <View style={{ alignItems: 'center', height: 32, justifyContent: 'center' }}>
-                <Ionicons name={name} size={28} color={color} />
-                {focused && <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />}
-              </View>
-            );
-          }
-
           return (
-            <View style={{ alignItems: 'center', height: 26, justifyContent: 'center' }}>
-              <Ionicons name={name} size={22} color={color} />
+            <View style={{ alignItems: 'center' }}>
+              <Ionicons name={name} size={size} color={color} />
               {focused && <View style={[tabStyles.activeDot, { backgroundColor: colors.text }]} />}
             </View>
           );

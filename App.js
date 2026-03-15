@@ -124,6 +124,14 @@ function MainTabs() {
           fontSize: 10,
           marginTop: 2,
         },
+        tabBarIconStyle: {
+          overflow: 'visible',
+          marginBottom: 0,
+        },
+        tabBarItemStyle: {
+          paddingTop: 0,
+          paddingBottom: 0,
+        },
         tabBarIcon: ({ focused, color, size }) => {
           const icons = {
             Home:    focused ? 'home'         : 'home-outline',

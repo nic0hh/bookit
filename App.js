@@ -127,7 +127,7 @@ function MainTabs() {
         tabBarIconStyle: {
           overflow: 'visible',
           marginBottom: 0,
-          height: 28,
+          height: 35,
         },
         tabBarItemStyle: {
           paddingTop: 0,

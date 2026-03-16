@@ -10,9 +10,9 @@ Like a merge of Pinterest and Mindler, you can save and organise your bookmarks 
 
 ## Demo
 
-![Adding a bookmark](assets/bookit_addbookmark.gif)
+![Adding a bookmark](assets/bookit.addbookmark.gif)
 
-![Browsing folders](assets/bookit_folder.gif)
+![Browsing folders](assets/bookit.folder.gif)
 
 ## Features
 - Pinterest-style masonry grid with dynamic aspect ratio cards

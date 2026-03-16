@@ -5,7 +5,14 @@ A visual bookmark app where you can save, organise, and share bookmarks on the g
 Like a merge of Pinterest and Mindler, you can save and organise your bookmarks in a dynamic grid. Bookmarks can be tagged, saved to folders, hidden, and shared with friends and family. This is not so much an app for an aesthetic feed, but for aesthetically organising all of those links and cool things you come across on a daily basis.
 
 ## Screenshots
-*Coming soon*
+
+<img src="assets/bookit_mobile_home.PNG" width="250"> <img src="assets/bookit_mobile_add.PNG" width="250">
+
+## Demo
+
+![Adding a bookmark](assets/bookit_addbookmark.gif)
+
+![Browsing folders](assets/bookit_folder.gif)
 
 ## Features
 - Pinterest-style masonry grid with dynamic aspect ratio cards

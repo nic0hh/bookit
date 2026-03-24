@@ -398,12 +398,12 @@ export default function BookmarkDetailScreen({ navigation, route }) {
               )}
             </View>
             <View style={[styles.webRight, { backgroundColor: colors.card }]}>
-              <FormContent />
+              {FormContent()}
             </View>
           </View>
         ) : (
           <View style={[styles.mobileForm, { backgroundColor: colors.card }]}>
-            <FormContent />
+            {FormContent()}
           </View>
         )}
       </KeyboardAvoidingView>

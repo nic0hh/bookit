@@ -8,3 +8,8 @@ comment on column public.bookmarks.image_width is 'Original width of bookmark im
 comment on column public.bookmarks.image_height is 'Original height of bookmark image in pixels';
 
 notify pgrst, 'reload schema';
+
+alter table public.bookmarks
+add column if not exists notes text;
+
+notify pgrst, 'reload schema';

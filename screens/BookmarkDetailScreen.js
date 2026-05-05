@@ -89,6 +89,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
 
   const [title, setTitle] = useState(bookmark?.title || '');
   const [url, setUrl] = useState(bookmark?.url || '');
+  const [notes, setNotes] = useState(bookmark?.notes || '');
   const [tags, setTags] = useState(bookmark?.tags || []);
   const [tagInput, setTagInput] = useState('');
   const [imageUri, setImageUri] = useState(bookmark?.image || null);
@@ -219,6 +220,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       image: imageUrlToSave, imagePath: imagePathToSave,
       imageWidth: imageDimensions.width ?? bookmark?.image_width ?? null,
       imageHeight: imageDimensions.height ?? bookmark?.image_height ?? null,
+      notes: notes.trim() || null,
     });
     setSaving(false);
     if (err) Alert.alert('Error', err);
@@ -331,6 +333,17 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         )
       )}
 
+      <Text style={[styles.fieldLabel, { color: colors.label }]}>Notes</Text>
+      <TextInput
+        style={[styles.input, styles.notesInput, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder, fontFamily: 'Quicksand_400Regular' }]}
+        value={notes}
+        onChangeText={setNotes}
+        placeholder="Add a note…"
+        placeholderTextColor={colors.label}
+        multiline
+        textAlignVertical="top"
+      />
+
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Tags</Text>
       <View style={[styles.tagsContainer, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}>
         {tags.map((tag, idx) => (
@@ -423,6 +436,7 @@ const styles = StyleSheet.create({
   formContent: { padding: 20, paddingBottom: 40 },
   fieldLabel: { fontSize: 11, fontFamily: 'Quicksand_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 16 },
   input: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15 },
+  notesInput: { minHeight: 90, paddingTop: 12 },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   actionChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1 },
   actionChipText: { fontSize: 13, fontFamily: 'Quicksand_500Medium' },

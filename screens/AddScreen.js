@@ -88,6 +88,7 @@ function BookmarkForm({
   tags, tagInput, handleTagInput, removeTag,
   selectedFolders, setSelectedFolders, checkDuplicate,
   duplicateWarning, saveBookmark, url, colors, folders,
+  notes, setNotes,
 }) {
   return (
     <ScrollView
@@ -127,6 +128,17 @@ function BookmarkForm({
           <Text style={[styles.imagePlaceholderText, { color: colors.label }]}>Upload image</Text>
         </TouchableOpacity>
       )}
+
+      <Text style={[styles.fieldLabel, { color: colors.label }]}>Notes</Text>
+      <TextInput
+        style={[styles.input, styles.notesInput, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.inputBorder, fontFamily: 'Quicksand_400Regular' }]}
+        value={notes}
+        onChangeText={setNotes}
+        placeholder="Add a note…"
+        placeholderTextColor={colors.label}
+        multiline
+        textAlignVertical="top"
+      />
 
       <Text style={[styles.fieldLabel, { color: colors.label }]}>Tags</Text>
       <View style={[styles.tagsContainer, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}>
@@ -188,6 +200,7 @@ export default function AddScreen({ navigation }) {
   const [selectedFolders, setSelectedFolders] = useState([]);
   const [previewError, setPreviewError] = useState('');
   const [duplicateWarning, setDuplicateWarning] = useState(null);
+  const [notes, setNotes] = useState('');
 
   useFocusEffect(
     React.useCallback(() => {
@@ -201,6 +214,7 @@ export default function AddScreen({ navigation }) {
       setSelectedFolders([]);
       setPreviewError('');
       setDuplicateWarning(null);
+      setNotes('');
     }, [])
   );
 
@@ -298,6 +312,7 @@ export default function AddScreen({ navigation }) {
       imageHeight: imageDimensions.height,
       tags: normalizeTags(tags),
       folderIds: selectedFolders,
+      notes: notes.trim() || null,
     });
     navigation.goBack();
   };
@@ -339,6 +354,7 @@ export default function AddScreen({ navigation }) {
     tags, tagInput, handleTagInput, removeTag,
     selectedFolders, setSelectedFolders, checkDuplicate,
     duplicateWarning, saveBookmark, url, colors, folders,
+    notes, setNotes,
   };
 
   // ── URL entry state ──
@@ -456,6 +472,7 @@ const styles = StyleSheet.create({
   formContent: { padding: 20, paddingBottom: 40 },
   fieldLabel: { fontSize: 11, fontFamily: 'Quicksand_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 16 },
   input: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15 },
+  notesInput: { minHeight: 90, paddingTop: 12 },
   duplicateWarning: { color: '#ef4444', fontSize: 12, fontFamily: 'Quicksand_400Regular', marginTop: 6, marginBottom: 4 },
   imageWrapper: { borderRadius: 12, overflow: 'hidden', position: 'relative', height: 180, marginTop: 8 },
   previewImage: { width: '100%', height: '100%', borderRadius: 12 },

@@ -249,18 +249,29 @@ export function BookmarksProvider({ children }) {
   async function updateBookmark(id, updates) {
     if (isViewingShared) return { error: "Cannot update bookmarks in a shared profile" };
 
+    // Only include fields the caller actually provided — a partial update
+    // (e.g. just { tags }) must not null out columns it wasn't given.
+    const payload = {};
+    if (updates.title !== undefined) payload.title = updates.title;
+    if (updates.url !== undefined) payload.url = updates.url;
+    if (updates.tags !== undefined) payload.tags = updates.tags;
+    if (updates.notes !== undefined) payload.notes = updates.notes;
+    if (updates.image !== undefined) payload.image = updates.image;
+    if (updates.imagePath !== undefined) payload.image_path = updates.imagePath;
+    if (updates.imageWidth !== undefined) payload.image_width = updates.imageWidth;
+    if (updates.imageHeight !== undefined) payload.image_height = updates.imageHeight;
+    if (updates.imagePositionX !== undefined) payload.image_position_x = updates.imagePositionX;
+    if (updates.imagePositionY !== undefined) payload.image_position_y = updates.imagePositionY;
+
+    const touchesFolders = updates.folderIds !== undefined || updates.folderId !== undefined;
     const resolvedFolders = updates.folderIds || (updates.folderId ? [updates.folderId] : []);
+    if (touchesFolders) {
+      payload.folder_id = resolvedFolders.length > 0 ? resolvedFolders[0] : null;
+    }
 
     const { error } = await supabase
       .from("bookmarks")
-      .update({
-        title: updates.title, url: updates.url, tags: updates.tags,
-        notes: updates.notes ?? null,
-        folder_id: resolvedFolders.length > 0 ? resolvedFolders[0] : null,
-        image: updates.image, image_path: updates.imagePath,
-        image_width: updates.imageWidth, image_height: updates.imageHeight,
-        image_position_x: updates.imagePositionX, image_position_y: updates.imagePositionY,
-      })
+      .update(payload)
       .eq("id", id);
 
     if (error) return error.message || "Update failed";
@@ -275,6 +286,18 @@ export function BookmarksProvider({ children }) {
     }
 
     await reloadAll();
+    return null;
+  }
+
+  // ---------------------------------------------------------------
+  // Update just the tags column, without triggering a full reload —
+  // used by batch operations that update many bookmarks in a row;
+  // the caller reloads once when the whole batch finishes.
+  // ---------------------------------------------------------------
+  async function updateBookmarkTags(id, tags) {
+    if (isViewingShared) return { error: "Cannot update bookmarks in a shared profile" };
+    const { error } = await supabase.from("bookmarks").update({ tags }).eq("id", id);
+    if (error) return error.message || "Update failed";
     return null;
   }
 
@@ -334,7 +357,7 @@ export function BookmarksProvider({ children }) {
     <BookmarksContext.Provider
       value={{
         bookmarks, folders, loading, reloadAll,
-        addBookmark, deleteBookmark, updateBookmark,
+        addBookmark, deleteBookmark, updateBookmark, updateBookmarkTags,
         addFolder, editFolder, removeFolder, moveFolder, setFolderHidden,
       }}
     >

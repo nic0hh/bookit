@@ -10,6 +10,7 @@ import { ThemeContext } from '../ThemeContext';
 import { filterBookmarksByQuery } from '../utils/searchBookmarks';
 
 const GAP = 8;
+const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
 
 // Theme swatch colours — one representative colour per theme
 const THEME_SWATCHES = {
@@ -29,14 +30,27 @@ function shuffleArray(array) {
   return arr;
 }
 
+// Runs `fn` over `items` with at most `limit` in flight at once.
+async function mapWithConcurrency(items, limit, fn) {
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < items.length) {
+      const i = nextIndex++;
+      await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
 export default function HomeScreen({ navigation }) {
   const { signOut, user } = useContext(AuthContext);
   const { themeName, colors, setThemeName } = useContext(ThemeContext);
-  const { bookmarks = [], folders = [], loading, reloadAll, updateBookmark } = useContext(BookmarksContext);
+  const { bookmarks = [], folders = [], loading, reloadAll, updateBookmark, updateBookmarkTags } = useContext(BookmarksContext);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [updatingDimensions, setUpdatingDimensions] = useState(false);
+  const [suggestingTags, setSuggestingTags] = useState(false);
   const debounceTimeout = useRef(null);
 
   const [shuffledLocal, setShuffledLocal] = useState([]);
@@ -113,6 +127,65 @@ useEffect(() => {
     }
     setUpdatingDimensions(false);
     alert(`Updated ${updated} of ${missingDims.length} bookmarks!`);
+    await reloadAll();
+  };
+
+  const suggestTagsForUntagged = async () => {
+    const untagged = bookmarks.filter(b => !b.tags || b.tags.length === 0);
+    if (untagged.length === 0) { alert('No untagged bookmarks found!'); return; }
+    const confirmed = confirm(`Suggest tags for ${untagged.length} untagged bookmark${untagged.length === 1 ? '' : 's'}? This calls Claude once per bookmark.`);
+    if (!confirmed) return;
+
+    setSuggestingTags(true);
+
+    // Reuse the user's most common existing tags as vocabulary hints,
+    // so the model prefers them over inventing near-duplicates.
+    const tagCounts = {};
+    bookmarks.forEach(b => (b.tags || []).forEach(t => {
+      tagCounts[t] = (tagCounts[t] || 0) + 1;
+    }));
+    const existingTags = Object.entries(tagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 30)
+      .map(([t]) => t);
+
+    let succeeded = 0;
+    let failed = 0;
+
+    await mapWithConcurrency(untagged, 8, async (bookmark) => {
+      try {
+        const folderIds = bookmark.folder_ids?.length > 0
+          ? bookmark.folder_ids
+          : (bookmark.folder_id ? [bookmark.folder_id] : []);
+        const folderName = folderIds.length > 0
+          ? folders.find(f => f.id === folderIds[0])?.name || null
+          : null;
+
+        const response = await fetch(`${API_BASE}/suggest-tags`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: bookmark.title,
+            url: bookmark.url,
+            existingTags,
+            folderName,
+          }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (data.tags && data.tags.length > 0) {
+          await updateBookmarkTags(bookmark.id, data.tags);
+          succeeded++;
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+    });
+
+    setSuggestingTags(false);
+    alert(`Tagged ${succeeded} of ${untagged.length} bookmarks${failed > 0 ? ` (${failed} failed)` : ''}.`);
     await reloadAll();
   };
 
@@ -330,6 +403,17 @@ useEffect(() => {
                 <Ionicons name="image-outline" size={18} color={colors.label} style={{ marginRight: 10 }} />
                 <Text style={[styles.modalActionText, { color: colors.label }]}>
                   {updatingDimensions ? 'Updating...' : 'Fix Image Dimensions'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalAction}
+                onPress={() => { setSettingsVisible(false); suggestTagsForUntagged(); }}
+                disabled={suggestingTags}
+              >
+                <Ionicons name="pricetags-outline" size={18} color={colors.label} style={{ marginRight: 10 }} />
+                <Text style={[styles.modalActionText, { color: colors.label }]}>
+                  {suggestingTags ? 'Suggesting tags...' : 'Suggest Tags for Untagged Bookmarks'}
                 </Text>
               </TouchableOpacity>
 

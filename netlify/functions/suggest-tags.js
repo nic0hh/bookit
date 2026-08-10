@@ -27,6 +27,7 @@ const SYSTEM_PROMPT = [
   "Prefer reusing one of the user's existing tags when it genuinely fits, rather than inventing a near-duplicate.",
   "Include both generic descriptive tags and, when the page is from a specialty or hobby site, specific terms actually present in the content (materials, techniques, sizes, etc.).",
   "Never guess or invent details that are not present in the given content.",
+  "Do not include tags that just restate the folder name, the site/source name, or the fact that this is a 'pattern'/'recipe'/'article' etc. — every bookmark in that folder or from that source already shares that trait, so it adds no search value.",
   "Each tag is a single word or short hyphenated phrase, lowercase, at most 32 characters, no punctuation besides hyphens."
 ].join(' ');
 
@@ -62,7 +63,7 @@ async function scrapePageContent(url) {
       ''
     ).trim();
 
-    const bodyText = $('body').text().replace(/\s+/g, ' ').trim().slice(0, 3000);
+    const bodyText = $('body').text().replace(/\s+/g, ' ').trim().slice(0, 6000);
 
     return { description, bodyText };
   } finally {

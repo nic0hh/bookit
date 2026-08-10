@@ -7,6 +7,7 @@ import { AuthContext } from '../context/AuthContext';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../ThemeContext';
+import { filterBookmarksByQuery } from '../utils/searchBookmarks';
 
 const GAP = 8;
 
@@ -82,18 +83,7 @@ useEffect(() => {
   useEffect(() => {
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
-      const q = searchQuery.toLowerCase();
-      if (!q) {
-        setFilteredBookmarks(shuffledLocal);
-      } else {
-        setFilteredBookmarks(
-          shuffledLocal.filter(
-            b =>
-              b.title?.toLowerCase().includes(q) ||
-              b.tags?.some(tag => tag.toLowerCase().includes(q))
-          )
-        );
-      }
+      setFilteredBookmarks(filterBookmarksByQuery(shuffledLocal, searchQuery));
     }, 150);
   }, [searchQuery, shuffledLocal]);
 
@@ -127,9 +117,12 @@ useEffect(() => {
   };
 
   const visible = (filteredBookmarks || []).filter(b => {
-    if (!b.folder_id) return true;
-    const f = folders.find(x => x.id === b.folder_id);
-    return !f?.hidden;
+    const folderIds = b.folder_ids?.length > 0 ? b.folder_ids : (b.folder_id ? [b.folder_id] : []);
+    if (folderIds.length === 0) return true;
+    // Only hide from Home when EVERY folder this bookmark belongs to is hidden —
+    // a bookmark cross-filed into at least one visible folder still shows.
+    const allHidden = folderIds.every(fid => folders.find(f => f.id === fid)?.hidden);
+    return !allHidden;
   });
 
   const numCols = Platform.OS === 'web'

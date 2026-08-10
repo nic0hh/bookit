@@ -6,6 +6,7 @@ import MasonryList from '@react-native-seoul/masonry-list';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../ThemeContext';
+import { filterBookmarksByQuery } from '../utils/searchBookmarks';
 
 function shuffleArray(array) {
   const arr = [...array];
@@ -66,18 +67,7 @@ export default function FolderBookmarksScreen({ navigation, route }) {
   useEffect(() => {
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
-      const queryTags = searchQuery.toLowerCase().split(' ').filter(Boolean);
-      if (queryTags.length === 0) {
-        setFilteredBookmarks(shuffledBookmarks);
-      } else {
-        const filtered = shuffledBookmarks.filter(b => {
-          if (!b.tags || b.tags.length === 0) return false;
-          return queryTags.every(qt =>
-            b.tags.map(t => t.toLowerCase()).includes(qt)
-          );
-        });
-        setFilteredBookmarks(filtered);
-      }
+      setFilteredBookmarks(filterBookmarksByQuery(shuffledBookmarks, searchQuery));
     }, 150);
   }, [searchQuery, shuffledBookmarks]);
 

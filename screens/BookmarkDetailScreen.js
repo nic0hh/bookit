@@ -134,10 +134,10 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
         .upload(filePath, blob, { contentType, upsert: true });
-      if (uploadError) return { imageUrl: uri, imagePath: null };
+      if (uploadError) return null;
       return { imageUrl: null, imagePath: filePath };
     } catch (err) {
-      return { imageUrl: uri, imagePath: null };
+      return null;
     }
   };
 
@@ -204,9 +204,13 @@ export default function BookmarkDetailScreen({ navigation, route }) {
 
     if (originalImage && !isRemoteUrl(originalImage)) {
       const uploadResult = await uploadImageIfNeeded(originalImage);
-      if (!uploadResult) { setSaving(false); return; }
-      imagePathToSave = uploadResult;
-      imageUrlToSave = null;
+      if (!uploadResult) {
+        setSaving(false);
+        Alert.alert('Error', 'Failed to upload image. Please try again.');
+        return;
+      }
+      imagePathToSave = uploadResult.imagePath;
+      imageUrlToSave = uploadResult.imageUrl;
     } else if (!imagePathToSave) {
       imageUrlToSave = originalImage || null;
       imagePathToSave = null;

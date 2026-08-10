@@ -1,5 +1,6 @@
 // context/BookmarksContext.js
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import { AppState } from "react-native";
 import { supabase } from "../supabaseClient";
 import { ProfilesContext } from "./ProfilesContext";
 
@@ -43,6 +44,22 @@ export function BookmarksProvider({ children }) {
       refreshExpiredSignedUrls();
     }, REFRESH_INTERVAL);
     return () => clearInterval(refreshTimerRef.current);
+  }, []);
+
+  // ---------------------------------------------------------------
+  // Also refresh signed URLs whenever the app returns to the
+  // foreground — the setInterval above doesn't fire while backgrounded,
+  // so without this, images whose signed URL expired while the app was
+  // backgrounded would stay broken until some unrelated action reloaded
+  // the bookmark list.
+  // ---------------------------------------------------------------
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        refreshExpiredSignedUrls();
+      }
+    });
+    return () => subscription.remove();
   }, []);
 
   async function refreshExpiredSignedUrls() {

@@ -268,10 +268,10 @@ export default function AddScreen({ navigation }) {
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
         .upload(filePath, blob, { contentType, upsert: true });
-      if (uploadError) return { imageUrl: uri, imagePath: null };
+      if (uploadError) return null;
       return { imageUrl: null, imagePath: filePath };
     } catch (err) {
-      return { imageUrl: uri, imagePath: null };
+      return null;
     }
   };
 
@@ -301,7 +301,10 @@ export default function AddScreen({ navigation }) {
 
     const originalImage = localImage || preview.image || null;
     const uploadResult = await uploadImageIfNeeded(originalImage);
-    if (originalImage && !uploadResult) return;
+    if (originalImage && !uploadResult) {
+      Alert.alert('Error', 'Failed to upload image. Please try again.');
+      return;
+    }
 
     await addBookmark({
       title: (preview.title || '').trim(),

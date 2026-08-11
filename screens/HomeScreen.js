@@ -51,6 +51,8 @@ export default function HomeScreen({ navigation }) {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [updatingDimensions, setUpdatingDimensions] = useState(false);
   const [suggestingTags, setSuggestingTags] = useState(false);
+  const [tagProgress, setTagProgress] = useState({ done: 0, total: 0 });
+  const failedTagBookmarksRef = useRef([]);
   const debounceTimeout = useRef(null);
 
   const [shuffledLocal, setShuffledLocal] = useState([]);
@@ -84,13 +86,16 @@ useEffect(() => {
     setFilteredBookmarks(shuffled);
     hasShuffled.current = true;
   } else {
-    // Subsequent updates — just prepend any new bookmarks to the front
+    // Subsequent updates — prepend any new bookmarks to the front, and refresh
+    // the data (tags, etc.) of ones already in the list so field-only changes
+    // like a batch tag update show up without needing a full app reload.
+    const byId = new Map(bookmarks.map(b => [b.id, b]));
     const existingIds = new Set(shuffledLocal.map(b => b.id));
     const newOnes = bookmarks.filter(b => !existingIds.has(b.id));
-    if (newOnes.length > 0) {
-      setShuffledLocal(prev => [...newOnes, ...prev]);
-      setFilteredBookmarks(prev => [...newOnes, ...prev]);
-    }
+    setShuffledLocal(prev => [
+      ...newOnes,
+      ...prev.filter(b => byId.has(b.id)).map(b => byId.get(b.id)),
+    ]);
   }
 }, [bookmarks]);
 
@@ -137,6 +142,8 @@ useEffect(() => {
     if (!confirmed) return;
 
     setSuggestingTags(true);
+    setTagProgress({ done: 0, total: untagged.length });
+    failedTagBookmarksRef.current = [];
 
     // Reuse the user's most common existing tags as vocabulary hints,
     // so the model prefers them over inventing near-duplicates.
@@ -171,21 +178,40 @@ useEffect(() => {
             folderName,
           }),
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          let serverMessage = '';
+          try { serverMessage = (await response.json()).error; } catch {}
+          throw new Error(serverMessage || `HTTP ${response.status}`);
+        }
         const data = await response.json();
         if (data.tags && data.tags.length > 0) {
           await updateBookmarkTags(bookmark.id, data.tags);
           succeeded++;
         } else {
           failed++;
+          failedTagBookmarksRef.current.push({ id: bookmark.id, title: bookmark.title, url: bookmark.url, reason: 'no tags returned' });
         }
-      } catch {
+      } catch (err) {
         failed++;
+        failedTagBookmarksRef.current.push({ id: bookmark.id, title: bookmark.title, url: bookmark.url, reason: err.message });
+      } finally {
+        setTagProgress(p => ({ ...p, done: p.done + 1 }));
       }
     });
 
     setSuggestingTags(false);
-    alert(`Tagged ${succeeded} of ${untagged.length} bookmarks${failed > 0 ? ` (${failed} failed)` : ''}.`);
+    if (failedTagBookmarksRef.current.length > 0) {
+      console.warn('Bookmarks that failed tag suggestion:', failedTagBookmarksRef.current);
+    }
+    const failedList = failedTagBookmarksRef.current
+      .slice(0, 10)
+      .map(b => `- ${b.title || b.url}`)
+      .join('\n');
+    const moreCount = failedTagBookmarksRef.current.length - 10;
+    alert(
+      `Tagged ${succeeded} of ${untagged.length} bookmarks${failed > 0 ? ` (${failed} failed)` : ''}.` +
+      (failed > 0 ? `\n\nFailed:\n${failedList}${moreCount > 0 ? `\n...and ${moreCount} more (see console log)` : ''}` : '')
+    );
     await reloadAll();
   };
 
@@ -437,11 +463,42 @@ useEffect(() => {
           <ActivityIndicator color={colors.label} />
         </View>
       )}
+
+      {suggestingTags && (
+        <View style={[styles.progressBanner, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <ActivityIndicator color={colors.label} style={{ marginRight: 10 }} />
+          <Text style={[styles.progressBannerText, { color: colors.text }]}>
+            Suggesting tags... {tagProgress.done}/{tagProgress.total}
+          </Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  progressBanner: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 0.7,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  progressBannerText: {
+    fontSize: 14,
+    fontFamily: 'Quicksand_500Medium',
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',

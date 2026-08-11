@@ -135,10 +135,11 @@ exports.handler = async function (event) {
       body: JSON.stringify({ tags })
     };
   } catch (e) {
+    console.error(`suggest-tags failed for ${url}:`, e);
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ error: 'Failed to generate tags' })
+      body: JSON.stringify({ error: e.message || 'Failed to generate tags' })
     };
   }
 };

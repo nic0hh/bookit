@@ -2,7 +2,7 @@ import React, { useState, useContext } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View, TextInput, Text, Image, StyleSheet, ScrollView,
-  TouchableOpacity, Modal, FlatList, Alert, Platform,
+  TouchableOpacity, Modal, FlatList, Platform,
   KeyboardAvoidingView, useWindowDimensions
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,6 +11,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ThemeContext } from '../ThemeContext';
 import { supabase } from '../supabaseClient';
 import { Ionicons } from '@expo/vector-icons';
+import { showAlert } from '../utils/alert';
 
 const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
 const STORAGE_BUCKET = 'bookmark-images';
@@ -254,6 +255,8 @@ export default function AddScreen({ navigation }) {
     setLoading(false);
   };
 
+  const isRemoteUrl = (uri) => /^https?:\/\//i.test(uri);
+
   const uploadImageIfNeeded = async (uri) => {
     if (!uri) return { imageUrl: null, imagePath: null };
     try {
@@ -294,23 +297,37 @@ export default function AddScreen({ navigation }) {
   const saveBookmark = async () => {
     const finalUrl = (preview.url || url || '').trim();
     if (!finalUrl) return;
-    if (finalUrl.length > 2048) { Alert.alert('Error', 'URL is too long.'); return; }
-    if ((preview.title || '').length > 300) { Alert.alert('Error', 'Title is too long (max 300 characters).'); return; }
-    if (tags.some(t => t.length > 32)) { Alert.alert('Error', 'Tags must be 32 characters or less.'); return; }
-    if (tags.length > 10) { Alert.alert('Error', 'You can add up to 10 tags per bookmark.'); return; }
+    if (finalUrl.length > 2048) { showAlert('Error', 'URL is too long.'); return; }
+    if ((preview.title || '').length > 300) { showAlert('Error', 'Title is too long (max 300 characters).'); return; }
+    if (tags.some(t => t.length > 32)) { showAlert('Error', 'Tags must be 32 characters or less.'); return; }
+    if (tags.length > 10) { showAlert('Error', 'You can add up to 10 tags per bookmark.'); return; }
 
     const originalImage = localImage || preview.image || null;
-    const uploadResult = await uploadImageIfNeeded(originalImage);
-    if (originalImage && !uploadResult) {
-      Alert.alert('Error', 'Failed to upload image. Please try again.');
-      return;
+
+    let imageUrlToSave = null;
+    let imagePathToSave = null;
+
+    if (originalImage && isRemoteUrl(originalImage)) {
+      // Already a remote URL (e.g. the scraped og:image) — hotlink it directly
+      // instead of fetching it into a blob to re-upload. That fetch is
+      // cross-origin and many sites (Ravelry among them) don't send
+      // Access-Control-Allow-Origin, so it fails in the browser every time.
+      imageUrlToSave = originalImage;
+    } else if (originalImage) {
+      const uploadResult = await uploadImageIfNeeded(originalImage);
+      if (!uploadResult) {
+        showAlert('Error', 'Failed to upload image. Please try again.');
+        return;
+      }
+      imageUrlToSave = uploadResult.imageUrl;
+      imagePathToSave = uploadResult.imagePath;
     }
 
     await addBookmark({
       title: (preview.title || '').trim(),
       url: finalUrl,
-      image: uploadResult?.imageUrl || null,
-      imagePath: uploadResult?.imagePath || null,
+      image: imageUrlToSave,
+      imagePath: imagePathToSave,
       imageWidth: imageDimensions.width,
       imageHeight: imageDimensions.height,
       tags: normalizeTags(tags),

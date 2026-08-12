@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { ThemeContext } from '../ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import { showAlert } from '../utils/alert';
 
 export default function FoldersScreen({ navigation }) {
   const { colors } = useContext(ThemeContext);
@@ -34,13 +35,13 @@ export default function FoldersScreen({ navigation }) {
 
   const createFolder = async () => {
     if (!newFolder.trim()) return;
-    if (isViewerMode) { Alert.alert('Read only', 'Viewing another profile — creating folders is disabled.'); return; }
+    if (isViewerMode) { showAlert('Read only', 'Viewing another profile — creating folders is disabled.'); return; }
     await addFolder(newFolder.trim());
     setNewFolder('');
   };
 
   const openEditModal = (folder) => {
-    if (isViewerMode) { Alert.alert('Read only', 'Viewing another profile — editing is disabled.'); return; }
+    if (isViewerMode) { showAlert('Read only', 'Viewing another profile — editing is disabled.'); return; }
     setEditingFolder(folder);
     setEditName(folder.name);
     setEditModalVisible(true);
@@ -58,7 +59,7 @@ export default function FoldersScreen({ navigation }) {
   const handleSave = async () => {
     if (!editingFolder) return;
     const error = await editFolder(editingFolder.id, editName.trim());
-    if (error) Alert.alert('Error', error);
+    if (error) showAlert('Error', error);
     else setEditModalVisible(false);
   };
 
@@ -66,10 +67,10 @@ export default function FoldersScreen({ navigation }) {
     if (!editingFolder) return;
     try {
       const err = await setFolderHidden(editingFolder.id, !editingFolder.hidden);
-      if (err) { Alert.alert('Error', String(err)); return; }
+      if (err) { showAlert('Error', String(err)); return; }
       setEditModalVisible(false);
       setEditingFolder(null);
-    } catch { Alert.alert('Error', 'Failed to update folder visibility'); }
+    } catch { showAlert('Error', 'Failed to update folder visibility'); }
   };
 
   return (

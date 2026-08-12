@@ -12,6 +12,7 @@ import { BookmarksContext } from '../context/BookmarksContext';
 import { ThemeContext } from '../ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient';
+import { showAlert } from '../utils/alert';
 
 const STORAGE_BUCKET = 'bookmark-images';
 const API_BASE = 'https://bookitweb.netlify.app/.netlify/functions';
@@ -159,19 +160,19 @@ export default function BookmarkDetailScreen({ navigation, route }) {
   };
 
   const refreshMetadata = async () => {
-    if (!url?.trim()) { Alert.alert('Error', 'Please enter a URL first'); return; }
+    if (!url?.trim()) { showAlert('Error', 'Please enter a URL first'); return; }
     setRefreshingMetadata(true);
     try {
       const response = await fetch(`${API_BASE}/fetch-metadata?url=${encodeURIComponent(url.trim())}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      if (data.error) { Alert.alert('Error', data.error); return; }
+      if (data.error) { showAlert('Error', data.error); return; }
       let updated = false;
       if (data.title) { setTitle(data.title); updated = true; }
       if (data.image) { setImageUri(data.image); setImagePath(null); updated = true; }
-      Alert.alert(updated ? 'Done' : 'No changes', updated ? 'Metadata refreshed. Save to apply.' : 'No new metadata found.');
+      showAlert(updated ? 'Done' : 'No changes', updated ? 'Metadata refreshed. Save to apply.' : 'No new metadata found.');
     } catch (err) {
-      Alert.alert('Error', 'Failed to fetch metadata.');
+      showAlert('Error', 'Failed to fetch metadata.');
     } finally {
       setRefreshingMetadata(false);
     }
@@ -193,9 +194,9 @@ export default function BookmarkDetailScreen({ navigation, route }) {
     Array.from(new Set(input.map(t => t.trim().toLowerCase()).filter(t => t && t.length <= 32)));
 
   const onSave = async () => {
-    if (url.length > 2048) { Alert.alert('Error', 'URL is too long.'); return; }
-    if (title.length > 300) { Alert.alert('Error', 'Title is too long.'); return; }
-    if (tags.length > 10) { Alert.alert('Error', 'Max 10 tags.'); return; }
+    if (url.length > 2048) { showAlert('Error', 'URL is too long.'); return; }
+    if (title.length > 300) { showAlert('Error', 'Title is too long.'); return; }
+    if (tags.length > 10) { showAlert('Error', 'Max 10 tags.'); return; }
 
     setSaving(true);
     const originalImage = imageUri || null;
@@ -206,7 +207,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       const uploadResult = await uploadImageIfNeeded(originalImage);
       if (!uploadResult) {
         setSaving(false);
-        Alert.alert('Error', 'Failed to upload image. Please try again.');
+        showAlert('Error', 'Failed to upload image. Please try again.');
         return;
       }
       imagePathToSave = uploadResult.imagePath;
@@ -227,7 +228,7 @@ export default function BookmarkDetailScreen({ navigation, route }) {
       notes: notes.trim() || null,
     });
     setSaving(false);
-    if (err) Alert.alert('Error', err);
+    if (err) showAlert('Error', err);
     else navigation.goBack();
   };
 
@@ -251,23 +252,23 @@ export default function BookmarkDetailScreen({ navigation, route }) {
         const result = await deleteBookmark(bookmark.id);
         setRemoving(false);
         if (!result) navigation.goBack();
-        else Alert.alert('Error', 'Failed to delete.');
+        else showAlert('Error', 'Failed to delete.');
       }},
     ]);
   };
 
   const copyUrl = () => {
-    if (url) { Clipboard.setStringAsync(url); Alert.alert('Copied', 'URL copied to clipboard!'); }
+    if (url) { Clipboard.setStringAsync(url); showAlert('Copied', 'URL copied to clipboard!'); }
   };
 
   const openUrl = async () => {
-    if (!url) { Alert.alert('No URL', 'No URL on this bookmark.'); return; }
-    if (url.startsWith('blob:')) { Alert.alert('Cannot open', 'Preview only available on web.'); return; }
+    if (!url) { showAlert('No URL', 'No URL on this bookmark.'); return; }
+    if (url.startsWith('blob:')) { showAlert('Cannot open', 'Preview only available on web.'); return; }
     try {
       const can = await Linking.canOpenURL(url);
       if (can) await Linking.openURL(url);
-      else Alert.alert('Cannot open', 'Cannot open this URL.');
-    } catch { Alert.alert('Error', 'Failed to open URL.'); }
+      else showAlert('Cannot open', 'Cannot open this URL.');
+    } catch { showAlert('Error', 'Failed to open URL.'); }
   };
 
   const FormContent = () => (

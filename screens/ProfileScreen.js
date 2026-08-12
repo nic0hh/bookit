@@ -1,7 +1,7 @@
 import React, { useContext, useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, TextInput,
-  Alert, StyleSheet, Modal, Platform,
+  StyleSheet, Modal, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { ProfilesContext } from '../context/ProfilesContext';
 import { BookmarksContext } from '../context/BookmarksContext';
 import { ThemeContext } from '../ThemeContext';
 import { supabase } from '../supabaseClient';
+import { showAlert } from '../utils/alert';
 
 // ── Reusable modal shell ─────────────────────────────────────────────────────
 function Sheet({ visible, onClose, children }) {
@@ -92,15 +93,15 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handleShare = async () => {
-    if (!shareEmail.trim()) { Alert.alert('Error', 'Please enter an email'); return; }
+    if (!shareEmail.trim()) { showAlert('Error', 'Please enter an email'); return; }
     setLoading(true);
     try {
       const { data, error } = await supabase.rpc('share_profile_with_email', { viewer_email: shareEmail.trim() });
-      if (error || data?.error) { Alert.alert('Error', error?.message || data?.error || 'Failed to share'); return; }
-      Alert.alert('Sent', `Share request sent to ${shareEmail}`);
+      if (error || data?.error) { showAlert('Error', error?.message || data?.error || 'Failed to share'); return; }
+      showAlert('Sent', `Share request sent to ${shareEmail}`);
       setShareEmail(''); setShareModalVisible(false);
       await loadSharedPermissions();
-    } catch { Alert.alert('Error', 'Something went wrong'); }
+    } catch { showAlert('Error', 'Something went wrong'); }
     finally { setLoading(false); }
   };
 
@@ -108,10 +109,10 @@ export default function ProfileScreen({ navigation }) {
     setLoading(true);
     try {
       const { data, error } = await supabase.rpc('unshare_profile_with_email', { viewer_email: viewerEmail });
-      if (error || data?.error) { Alert.alert('Error', error?.message || data?.error || 'Failed to unshare'); return; }
-      Alert.alert('Done', `Unshared with ${viewerEmail}`);
+      if (error || data?.error) { showAlert('Error', error?.message || data?.error || 'Failed to unshare'); return; }
+      showAlert('Done', `Unshared with ${viewerEmail}`);
       await loadSharedPermissions();
-    } catch { Alert.alert('Error', 'Something went wrong'); }
+    } catch { showAlert('Error', 'Something went wrong'); }
     finally { setLoading(false); }
   };
 
@@ -119,9 +120,9 @@ export default function ProfileScreen({ navigation }) {
     setLoading(true);
     try {
       const { error } = await acceptShareRequest(requestId);
-      if (error) { Alert.alert('Error', error.message || 'Failed to accept'); return; }
-      Alert.alert('Accepted', `You can now view ${username}'s bookmarks`);
-    } catch { Alert.alert('Error', 'Something went wrong'); }
+      if (error) { showAlert('Error', error.message || 'Failed to accept'); return; }
+      showAlert('Accepted', `You can now view ${username}'s bookmarks`);
+    } catch { showAlert('Error', 'Something went wrong'); }
     finally { setLoading(false); }
   };
 
@@ -129,9 +130,9 @@ export default function ProfileScreen({ navigation }) {
     setLoading(true);
     try {
       const { error } = await denyShareRequest(requestId);
-      if (error) { Alert.alert('Error', error.message || 'Failed to deny'); return; }
-      Alert.alert('Denied', `Denied request from ${username}`);
-    } catch { Alert.alert('Error', 'Something went wrong'); }
+      if (error) { showAlert('Error', error.message || 'Failed to deny'); return; }
+      showAlert('Denied', `Denied request from ${username}`);
+    } catch { showAlert('Error', 'Something went wrong'); }
     finally { setLoading(false); }
   };
 
@@ -146,11 +147,11 @@ export default function ProfileScreen({ navigation }) {
     setLoading(true);
     try {
       const { error } = await updateSharedFolders(editingPermission.id, selectedFolderIds);
-      if (error) { Alert.alert('Error', error.message || 'Failed to update'); return; }
-      Alert.alert('Updated', 'Folder permissions updated');
+      if (error) { showAlert('Error', error.message || 'Failed to update'); return; }
+      showAlert('Updated', 'Folder permissions updated');
       setEditModalVisible(false); setEditingPermission(null); setSelectedFolderIds([]);
       await loadMyFolders();
-    } catch { Alert.alert('Error', 'Something went wrong'); }
+    } catch { showAlert('Error', 'Something went wrong'); }
     finally { setLoading(false); }
   };
 
@@ -373,7 +374,7 @@ export default function ProfileScreen({ navigation }) {
               if (email && !blockedEmails.includes(email)) {
                 setBlockedEmails([...blockedEmails, email]);
                 handleUnshare(email);
-                Alert.alert('Blocked', `${email} has been blocked`);
+                showAlert('Blocked', `${email} has been blocked`);
               }
             }}
           >
@@ -398,10 +399,10 @@ export default function ProfileScreen({ navigation }) {
               setLoading(true);
               try {
                 const { error } = await denyShareRequest(selectedSharedProfile.id);
-                if (error) { Alert.alert('Error', error.message || 'Failed'); return; }
+                if (error) { showAlert('Error', error.message || 'Failed'); return; }
                 if (activeProfileId === selectedSharedProfile.owner_id) switchActiveProfile(null);
-                Alert.alert('Removed', `Removed ${selectedSharedProfile.username}`);
-              } catch { Alert.alert('Error', 'Something went wrong'); }
+                showAlert('Removed', `Removed ${selectedSharedProfile.username}`);
+              } catch { showAlert('Error', 'Something went wrong'); }
               finally { setLoading(false); }
             }}
           >

@@ -5,7 +5,7 @@ Live demo: https://bookitweb.netlify.app/ (account required)
 ## Description
 Like a merge of Pinterest and Mindler, you can save and organise your bookmarks in a dynamic grid. Bookmarks can be tagged, saved to folders, hidden, and shared with friends and family. This is not so much an app for an aesthetic feed, but for aesthetically organising all of those links and cool things you come across on a daily basis.
 
-Built as a personal project using AI-assisted development. The security model, architecture decisions, SQL migrations, and known limitations were designed and reviewed by me throughout the process.
+Built as a personal project using AI-assisted development. The security model, architecture decisions, SQL migrations, and known limitations were designed and reviewed by me throughout the process — see [Agentic Debugging & Data Repair](https://github.com/nic0hh/nico0hh/tree/main/agentic-debugging) for a documented example of that review process in practice, including a data-corruption bug caught and repaired.
 
 ## Screenshots
 
